@@ -11,6 +11,10 @@ This is a simple demo application that allows users to execute **Maven commands*
 
 ---
 
+![Maven Executor Demo](assets/demo_screenshot.png)
+
+---
+
 ## 🚀 Installation & Setup
 
 ### **1️⃣ Clone the Repository**
