@@ -1,0 +1,39 @@
+# Ignore target directory (compiled files)
+target/
+
+# Ignore Maven dependency caches
+.mvn/
+.mvn/wrapper/maven-wrapper.jar
+
+# Ignore Eclipse & IntelliJ project files
+*.iml
+.idea/
+.classpath
+.project
+.settings/
+
+# Ignore compiled Java classes
+**/*.class
+
+# Ignore logs and temporary files
+logs/
+*.log
+
+# Ignore OS-specific files (Mac and Windows)
+.DS_Store
+Thumbs.db
+
+# Ignore environment files
+.env
+
+# Ignore Java build tool files
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+
+# Ignore test reports and coverage
+test-output/
+surefire-reports/
+jacoco/
