@@ -45,26 +45,42 @@ const App: React.FC = () => {
         flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
-        height: "100vh", // Full viewport height
-        width: "100vw", // Full viewport width
+        height: "100vh",
+        width: "100vw",
         padding: "20px",
         fontFamily: "Arial, sans-serif",
-        backgroundColor: "#1e1e1e", // Dark background for better contrast
+        backgroundColor: "#1e1e1e",
         color: "#ffffff",
       }}
     >
-      <h2 style={{ fontSize: "24px", marginBottom: "15px" }}>
+      <h2
+        style={{ fontSize: "22px", textAlign: "center", marginBottom: "15px" }}
+      >
         📦 Maven Command Executor
       </h2>
 
-      <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
+      {/* Buttons for Maven commands */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          gap: "10px",
+          marginBottom: "15px",
+          width: "100%",
+        }}
+      >
         {["validate", "compile", "test", "package", "clean"].map((cmd) => (
           <button
             key={cmd}
             onClick={() => runMavenCommand(cmd)}
             disabled={loading}
             style={{
-              padding: "10px 20px",
+              flex: "1 1 120px", // Ensures buttons resize dynamically
+              padding: "10px 15px",
+              minWidth: "100px",
+              maxWidth: "180px",
+              fontSize: "14px",
               backgroundColor: loading
                 ? "#777"
                 : cmd === "clean"
@@ -80,6 +96,7 @@ const App: React.FC = () => {
               border: "none",
               borderRadius: "5px",
               cursor: loading ? "not-allowed" : "pointer",
+              textAlign: "center",
             }}
           >
             Maven {cmd.charAt(0).toUpperCase() + cmd.slice(1)}
@@ -87,7 +104,10 @@ const App: React.FC = () => {
         ))}
       </div>
 
-      <h3 style={{ fontSize: "18px", marginBottom: "10px" }}>
+      {/* Console Output */}
+      <h3
+        style={{ fontSize: "18px", marginBottom: "10px", textAlign: "center" }}
+      >
         Console Output:
       </h3>
       <div
@@ -95,8 +115,10 @@ const App: React.FC = () => {
           background: "#282828",
           color: "#ffffff",
           padding: "10px",
-          width: "90vw", // Almost full width
-          height: "60vh", // Takes most of the vertical space
+          width: "90vw",
+          maxWidth: "800px",
+          height: "60vh",
+          minHeight: "250px",
           overflowY: "auto",
           fontFamily: "monospace",
           borderRadius: "5px",
@@ -121,7 +143,13 @@ const App: React.FC = () => {
           return (
             <div
               key={index}
-              style={{ color, marginBottom: "2px", whiteSpace: "pre-wrap" }}
+              style={{
+                color,
+                marginBottom: "2px",
+                whiteSpace: "pre-wrap",
+                fontSize: "14px",
+                lineHeight: "1.4",
+              }}
             >
               {log}
             </div>

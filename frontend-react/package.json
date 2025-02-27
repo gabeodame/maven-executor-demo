@@ -5,18 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "pnpm install",
+    "prebuild": "npm install",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
-  },
-  "pnpm": {
-    "overrides": {
-      "rollup": "npm:@rollup/wasm-node"
-    }
-  },
-  "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "4.9.5"
   },
   "dependencies": {
     "react": "^19.0.0",
