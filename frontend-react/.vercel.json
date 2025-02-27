@@ -1,0 +1,11 @@
+{
+  "build": {
+    "env": {
+      "NPM_RC": "pnpm",
+      "PNPM_HOME": ".pnpm",
+      "PNPM_CACHE": ".pnpm-store",
+      "NODE_ENV": "production"
+    }
+  }
+}
+
