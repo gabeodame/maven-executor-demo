@@ -11,6 +11,12 @@ This is a simple demo application that allows users to execute **Maven commands*
 
 ---
 
+## 🌍 Live Demo
+
+[Click here to try the app! 🚀](https://maven-executor-demo-git-main-gabes-projects-2fbd9313.vercel.app/)
+
+---
+
 ![Maven Executor Demo](assets/demo_screenshot.png)
 
 ---

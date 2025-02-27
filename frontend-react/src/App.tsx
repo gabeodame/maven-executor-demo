@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:5001", {
-  transports: ["websocket", "polling"],
-  withCredentials: true,
-});
+const socket = io(
+  import.meta.env.VITE_API_URL || "http://localhost:5001", // Default to localhost for dev
+  {
+    transports: ["websocket", "polling"],
+    withCredentials: true,
+  }
+);
 
 const App: React.FC = () => {
   const [logs, setLogs] = useState<string[]>([]);
