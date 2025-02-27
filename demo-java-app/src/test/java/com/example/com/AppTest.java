@@ -28,9 +28,19 @@ public class AppTest
     /**
      * Rigourous Test :-)
      */
-    public void testadd() {
+    public void testadd1() {
         assertTrue(30 == App.add(15, 15));
+
+    }
+
+    public void testadd2() {
         assertTrue(30 == App.add(10, 20));
         assertFalse(10 == App.add(20, 10));
     }
+
+    public void testadd3() {
+
+        assertFalse(10 == App.add(20, 10));
+    }
+
 }
