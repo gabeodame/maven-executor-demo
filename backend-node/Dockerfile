@@ -1,22 +1,31 @@
-# Use lightweight Node.js image
-FROM node:20-alpine
+# Stage 1: Build TypeScript
+FROM node:20-alpine AS builder
 
-# Set working directory inside the container
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm install # Installs devDependencies including TypeScript
+COPY . . 
+
+# Set NODE_ENV explicitly
+ENV NODE_ENV=production
+
+# Compile TypeScript
+RUN npm run build 
+
+# Stage 2: Run production code
+FROM node:20-alpine AS runner
+
 WORKDIR /app
 
-# Copy package.json and install dependencies separately (better caching)
-COPY package.json package-lock.json ./
+# Copy only built output and necessary files (NO devDependencies)
+COPY --from=builder /app/package.json /app/package-lock.json ./
+COPY --from=builder /app/dist /app/dist
+
+# Install only production dependencies
 RUN npm install --production
 
-# Now copy the rest of the application (excluding node_modules)
-COPY . .
-
-# Ensure node_modules exists and is not overwritten
-RUN ls -la node_modules || echo "node_modules missing"
-
-# Expose the Fly.io port
-ENV PORT=8080
+# Expose the port
 EXPOSE 8080
 
-# Start the backend server
+# Start the backend
 CMD ["node", "dist/server.js"]

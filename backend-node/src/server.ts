@@ -8,7 +8,10 @@ import path from "path";
 import dotenv from "dotenv";
 dotenv.config();
 
-const PORT = process.env.PORT || 5001; // Default to port 5001
+const PORT =
+  process.env.NODE_ENV === "production"
+    ? Number(process.env.PORT) || 8080 // Default to 8080 in production
+    : 5001; // Use 5001 in development
 
 // ✅ Set the correct path for Maven
 const MAVEN_PATH = "/usr/local/bin/mvn"; // Ensure this matches `which mvn`
@@ -18,17 +21,19 @@ const JAVA_PROJECT_PATH = path.resolve(__dirname, "../../demo-java-app");
 console.log(`Using Java Project Path: ${JAVA_PROJECT_PATH}`);
 console.log(`Using Maven Path: ${MAVEN_PATH}`);
 
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",");
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: allowedOrigins.length > 0 ? allowedOrigins : "*",
     methods: ["GET", "POST"],
   },
 });
 
 // ✅ Enable CORS for frontend communication
-app.use(cors({ origin: "http://localhost:5173" }));
+app.use(cors({ origin: allowedOrigins }));
 
 io.on("connection", (socket) => {
   console.log("Client connected");
@@ -63,6 +68,6 @@ io.on("connection", (socket) => {
 
 // ✅ Start the backend server
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });

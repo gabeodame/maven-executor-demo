@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for backend-node-frosty-dust-7092 on 2025-02-27T09:55:48-05:00
+# fly.toml app configuration file generated for maven-executor-demo on 2025-02-27T10:15:28-05:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'backend-node-frosty-dust-7092'
+app = 'maven-executor-demo'
 primary_region = 'iad'
 
 [build]
