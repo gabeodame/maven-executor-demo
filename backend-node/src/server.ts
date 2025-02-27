@@ -5,6 +5,11 @@ import cors from "cors";
 import { spawn } from "child_process";
 import path from "path";
 
+import dotenv from "dotenv";
+dotenv.config();
+
+const PORT = process.env.PORT || 5001; // Default to port 5001
+
 // ✅ Set the correct path for Maven
 const MAVEN_PATH = "/usr/local/bin/mvn"; // Ensure this matches `which mvn`
 const JAVA_PROJECT_PATH = path.resolve(__dirname, "../../demo-java-app");
@@ -57,7 +62,7 @@ io.on("connection", (socket) => {
 });
 
 // ✅ Start the backend server
-const PORT = 5001;
+
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
