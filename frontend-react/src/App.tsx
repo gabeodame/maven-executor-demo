@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 
+const isDev = import.meta.env.MODE === "development";
+
 const socket = io(
-  import.meta.env.VITE_API_URL || "http://localhost:5001", // Default to localhost for dev
+  isDev ? "http://localhost:5001" : import.meta.env.VITE_API_URL,
   {
     transports: ["websocket", "polling"],
     withCredentials: true,
@@ -14,7 +16,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
 
   const runMavenCommand = (command: string) => {
-    setLogs([]);
+    setLogs([`▶️ Executing mvn ${command}...`]); // Clear previous logs and show immediate feedback
     setLoading(true);
     socket.emit("run-maven-command", command);
   };

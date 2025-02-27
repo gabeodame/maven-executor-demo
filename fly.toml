@@ -1,0 +1,24 @@
+app = "maven-executor-demo"
+primary_region = "iad"
+
+[build]
+  dockerfile = "backend-node/Dockerfile"   # ✅ Tell Fly where the backend Dockerfile is
+  context = "backend-node"                 # ✅ Ensure Fly builds inside backend-node, NOT project root
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+
+[env]
+  NODE_ENV = "production"
+  MAVEN_PATH = "/usr/bin/mvn"
+  JAVA_PROJECT_PATH = "/app/demo-java-app"
+  
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1

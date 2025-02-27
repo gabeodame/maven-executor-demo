@@ -1,31 +1,51 @@
-# Stage 1: Build TypeScript
+# Stage 1: Build Stage
 FROM node:20-alpine AS builder
 
+# Install required dependencies (Java & Maven)
+RUN apk add --no-cache openjdk17 maven
+
+# Set working directory
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm install # Installs devDependencies including TypeScript
-COPY . . 
 
-# Set NODE_ENV explicitly
-ENV NODE_ENV=production
+# Copy backend package files
+COPY backend-node/package.json backend-node/package-lock.json ./
+RUN npm install
 
-# Compile TypeScript
-RUN npm run build 
+# Copy backend source code & build
+COPY backend-node/. .
+RUN npm run build
 
-# Stage 2: Run production code
+# Copy Java project from root
+COPY demo-java-app /app/demo-java-app  
+
+# Stage 2: Production Stage
 FROM node:20-alpine AS runner
 
+# Set working directory
 WORKDIR /app
 
-# Copy only built output and necessary files (NO devDependencies)
-COPY --from=builder /app/package.json /app/package-lock.json ./
+# Install Java & Maven for executing Maven commands
+RUN apk add --no-cache openjdk17 maven
+
+# Copy only required files from builder
 COPY --from=builder /app/dist /app/dist
+COPY --from=builder /app/package.json /app/package-lock.json ./
+COPY --from=builder /app/demo-java-app /app/demo-java-app 
 
 # Install only production dependencies
 RUN npm install --production
 
-# Expose the port
+# Set Environment Variables
+ENV NODE_ENV=production
+ENV PORT=8080
+ENV MAVEN_PATH="/usr/bin/mvn"
+ENV JAVA_PROJECT_PATH="/app/demo-java-app"
+
+# Ensure Maven is accessible
+RUN ln -s /usr/bin/mvn /usr/local/bin/mvn
+
+# Expose Port
 EXPOSE 8080
 
-# Start the backend
+# Start Server
 CMD ["node", "dist/server.js"]
