@@ -1,11 +1,13 @@
 #!/bin/sh
 
-# Install Java & Maven
+# Install Java & Maven (for executing Maven commands)
 apt update && apt install -y openjdk-17-jdk maven
 
-# Build TypeScript Code (Ensures dist/server.js is created)
+# Install Node.js dependencies
 npm install
+
+# Compile TypeScript (Ensures dist/server.js exists)
 npm run build
 
 # Start the Node.js Backend from dist/
-node dist/server.js
+exec node dist/server.js
