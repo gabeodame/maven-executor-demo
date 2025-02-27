@@ -18,4 +18,26 @@ This is a simple demo application that allows users to execute **Maven commands*
 ```sh
 git clone https://github.com/gabeodame/maven-executor-demo.git
 cd maven-executor-demo
+```
+
+---
+
+### 2️⃣ Install Dependencies & Start Application
+
+#### Backend
+
+```sh
+cd backend-node
+npm install
+npm run dev
+```
+
+### Frontend
+
+```sh
+cd frontend-react
+npm install
+npm run dev
+```
+
 
