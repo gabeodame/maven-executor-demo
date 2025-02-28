@@ -5,11 +5,26 @@ interface ConsoleOutputProps {
 }
 
 const getLogColor = (log: string) => {
-  if (log.includes("ERROR")) return "text-red-500";
-  if (log.includes("SUCCESS") || log.includes("BUILD SUCCESS"))
-    return "text-green-400";
-  if (log.includes("WARNING")) return "text-yellow-400";
-  if (log.includes("[INFO]")) return "text-blue-300";
+  if (
+    log.includes("ERROR") ||
+    log.match(/Failures:\s*[1-9]/) ||
+    log.match(/Errors:\s*[1-9]/)
+  ) {
+    return "text-red-500"; // ❌ Failure/Error detected
+  }
+  if (
+    log.includes("SUCCESS") ||
+    log.includes("BUILD SUCCESS") ||
+    log.match(/Failures:\s*0, Errors:\s*0/)
+  ) {
+    return "text-green-400"; // ✅ Success or All Tests Passed
+  }
+  if (log.includes("WARNING")) {
+    return "text-yellow-400";
+  }
+  if (log.includes("[INFO]")) {
+    return "text-blue-300";
+  }
   return "text-gray-300";
 };
 
