@@ -7,7 +7,7 @@ This is a simple demo application that allows users to execute **Maven commands*
 ✅ Run Maven commands directly from the browser  
 ✅ View real-time logs with color-coded output  
 ✅ Uses WebSockets for real-time communication  
-✅ Full-stack app with **Node.js + React**  
+✅ Full-stack app with **Node.js + Next.js**  
 
 ---
 
