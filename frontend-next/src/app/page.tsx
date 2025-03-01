@@ -1,8 +1,8 @@
 import Executor from "./components/Executor";
 
-export default function Home() {
+export default async function Home() {
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full flex flex-col items-center p-6">
       <Executor />
     </div>
   );

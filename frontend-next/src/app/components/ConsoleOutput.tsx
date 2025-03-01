@@ -30,7 +30,7 @@ const getLogColor = (log: string) => {
 
 const ConsoleOutput = ({ logs }: ConsoleOutputProps) => {
   return (
-    <div className="bg-gray-800 text-white p-3 w-[90vw] max-w-[800px] h-[60vh] min-h-[250px] overflow-y-auto font-mono rounded-md border border-gray-700 flex flex-col">
+    <div className="bg-gray-800 text-white p-3 w-full h-full overflow-y-auto font-mono rounded-md border border-gray-700 flex flex-col">
       {logs.map((log, index) => (
         <div
           key={index}

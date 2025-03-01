@@ -1,26 +1,36 @@
 import express from "express";
-import { Server } from "socket.io";
 import http from "http";
+import { Server } from "socket.io";
 import cors from "cors";
-import { config } from "./config/env";
-import { setupSocketRoutes } from "./routes/socketRoutes";
+import { runMavenCommand, setRepoPath } from "./services/mavenService";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: config.ALLOWED_ORIGINS,
-    methods: ["GET", "POST"],
-  },
+  cors: { origin: "*" },
 });
 
-// ✅ Enable CORS
-app.use(cors({ origin: config.ALLOWED_ORIGINS }));
+app.use(cors());
+app.use(express.json());
 
-// ✅ Setup WebSockets
-setupSocketRoutes(io);
+// ✅ Register API to Update Java Project Path
+app.post("/api/set-repo-path", setRepoPath);
+
+io.on("connection", (socket) => {
+  console.log("✅ Client connected");
+
+  socket.on("run-maven", (command) => {
+    console.log(`🚀 Received command from client: ${command}`);
+    runMavenCommand(io, socket, command);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("❌ Client disconnected");
+  });
+});
 
 // ✅ Start Server
-server.listen(config.PORT, "0.0.0.0", () => {
-  console.log(`✅ Server running on port ${config.PORT}`);
+const PORT = 5001;
+server.listen(PORT, () => {
+  console.log(`✅ Backend Server running on port ${PORT}`);
 });
