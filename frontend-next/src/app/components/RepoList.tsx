@@ -11,7 +11,7 @@ export default function RepoList() {
   const [repos, setRepos] = useState<
     { id: number; name: string; clone_url: string }[]
   >([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [cloning, setCloning] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<{
     name: string;
@@ -23,52 +23,54 @@ export default function RepoList() {
   useEffect(() => {
     if (!session?.accessToken) return;
 
+    setLoading(true); // ✅ Only set loading when actively fetching
     fetch("/api/github/repos", {
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-      },
+      headers: { Authorization: `Bearer ${session.accessToken}` },
     })
       .then((res) => res.json())
       .then((data) => {
         setRepos(data);
-        setLoading(false);
       })
       .catch((err) => {
-        console.error("Error fetching repos:", err);
-        setLoading(false);
-      });
+        console.error("❌ Error fetching repos:", err);
+      })
+      .finally(() => setLoading(false)); // ✅ Ensure loading is turned off
   }, [session]);
 
   const handleClone = async () => {
-    if (!selectedRepo) return alert("Please select a repository!");
-    setCloning(true);
-    console.log("Cloning repo:", selectedRepo.clone_url);
-    const response = await fetch("/api/github/clone", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clone_url: selectedRepo.clone_url }),
-    });
+    if (!selectedRepo) {
+      alert("Please select a repository!");
+      return;
+    }
 
-    const result = await response.json();
-    setCloning(false);
-    setLogs([]);
-    if (response.ok) {
-      <CustomToast message={result.message} />;
-    } else {
-      <CustomToast message={result.error} />;
+    setCloning(true);
+    console.log("📂 Cloning repo:", selectedRepo.clone_url);
+
+    try {
+      const response = await fetch("/api/github/clone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clone_url: selectedRepo.clone_url }),
+      });
+
+      const result = await response.json();
+      setLogs([]);
+
+      if (response.ok) {
+        CustomToast({ message: result.message });
+      } else {
+        CustomToast({ message: result.error });
+      }
+    } catch (error) {
+      console.error("❌ Clone error:", error);
+      CustomToast({ message: "Failed to clone repository" });
+    } finally {
+      setCloning(false);
     }
   };
 
-  if (cloning) {
-    return (
-      <div className="flex justify-center items-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-lg mx-auto mt-10 p-2 bg-gray-900 text-white rounded-lg shadow-md">
+    <div className="max-w-lg mx-auto mt-10 p-4 bg-gray-900 text-white rounded-lg shadow-md">
       <div className="w-full mb-4">
         <GithubIntegration />
       </div>
@@ -76,6 +78,7 @@ export default function RepoList() {
         Select a Repository
       </h2>
 
+      {/* Show spinner only when fetching repos */}
       {loading ? (
         <div className="flex justify-center items-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white"></div>
@@ -90,17 +93,11 @@ export default function RepoList() {
               );
               setSelectedRepo(selected || null);
             }}
-            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-cyan-950-500"
+            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-cyan-500"
           >
-            <option value="" className="w-full">
-              -- Select a Repository --
-            </option>
+            <option value="">-- Select a Repository --</option>
             {repos.map((repo) => (
-              <option
-                key={repo.id}
-                value={repo.name}
-                className="w-full bg-blue-700"
-              >
+              <option key={repo.id} value={repo.name} className="bg-blue-700">
                 {repo.name}
               </option>
             ))}
@@ -108,10 +105,14 @@ export default function RepoList() {
 
           <button
             onClick={handleClone}
-            disabled={!selectedRepo}
-            className="w-full bg-cyan-900 hover:bg-cyan-800 text-white px-4 py-2 rounded-lg transition-all disabled:bg-gray-600 cursor-pointer"
+            disabled={!selectedRepo || cloning}
+            className={`w-full text-white px-4 py-2 rounded-lg transition-all ${
+              cloning
+                ? "bg-gray-600 cursor-not-allowed"
+                : "bg-cyan-900 hover:bg-cyan-800 cursor-pointer"
+            }`}
           >
-            Clone Repository
+            {cloning ? "Cloning..." : "Clone Repository"}
           </button>
         </div>
       )}
