@@ -40,7 +40,7 @@ io.on("connection", (socket) => {
 });
 
 // ✅ Start Server
-const PORT = 5001;
-server.listen(PORT, () => {
-  console.log(`✅ Backend Server running on port ${PORT}`);
+
+server.listen(config.PORT, () => {
+  console.log(`✅ Backend Server running on port ${config.PORT}`);
 });
