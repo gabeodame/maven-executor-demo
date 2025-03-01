@@ -2,7 +2,9 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
-import { runMavenCommand, setRepoPath } from "./services/mavenService";
+import serverRoutes from "./routes/serverRoutes";
+import { runMavenCommand } from "./services/mavenService";
+import { config } from "./config/env";
 
 const app = express();
 const server = http.createServer(app);
@@ -10,12 +12,20 @@ const io = new Server(server, {
   cors: { origin: "*" },
 });
 
-app.use(cors());
+app.use(
+  cors({
+    origin: config.ALLOWED_ORIGINS,
+    credentials: true, // ✅ Allows cookies & auth headers
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 app.use(express.json());
 
-// ✅ Register API to Update Java Project Path
-app.post("/api/set-repo-path", setRepoPath);
+// ✅ Register API Routes
+app.use("/api", serverRoutes);
 
+// ✅ WebSocket Handling
 io.on("connection", (socket) => {
   console.log("✅ Client connected");
 

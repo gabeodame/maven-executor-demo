@@ -4,6 +4,7 @@ import { useSocket } from "../hooks/useSocket";
 import MavenButton from "./MavenButton";
 import ConsoleOutput from "./ConsoleOutput";
 import RepoList from "./RepoList"; // ✅ Integrate RepoList inside Executor
+import Artifacts from "./Artifacts";
 
 const Executor = () => {
   const { logs, loading, runMavenCommand } = useSocket();
@@ -39,7 +40,10 @@ const Executor = () => {
         </h3>
         <div className="flex-1 overflow-hidden">
           <ConsoleOutput logs={logs} />
+
+          {/* Build Artificats */}
         </div>
+        <Artifacts />
       </div>
     </div>
   );

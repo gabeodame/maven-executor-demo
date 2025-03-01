@@ -5,35 +5,15 @@ import {
 } from "../config/paths";
 import { Server } from "socket.io";
 import fs from "fs";
-
-let JAVA_PROJECT_PATH = DEFAULT_PROJECT_PATH; // ✅ Default to demo-java-app
-
-// ✅ API Endpoint to Dynamically Update Java Project Path
-export const setRepoPath = (req: any, res: any) => {
-  const { repoPath } = req.body;
-
-  console.log(`🔍 Received repo path update request: ${repoPath}`);
-
-  if (!repoPath || !fs.existsSync(repoPath)) {
-    console.log(`❌ Invalid repo path: ${repoPath}`);
-    return res.status(400).json({ error: "Invalid repository path" });
-  }
-
-  JAVA_PROJECT_PATH = repoPath; // ✅ Update the global Java project path
-  console.log(`✅ Updated Java project path: ${JAVA_PROJECT_PATH}`);
-
-  return res
-    .status(200)
-    .json({ message: "Repository path updated successfully" });
-};
+import { getJavaProjectPath } from "../config/projectPaths";
 
 // ✅ Ensure runMavenCommand() uses the updated JAVA_PROJECT_PATH
 export const runMavenCommand = (io: Server, socket: any, command: string) => {
+  const JAVA_PROJECT_PATH = getJavaProjectPath();
   console.log(`▶️ Executing Maven in: ${JAVA_PROJECT_PATH}`);
-  console.log(`▶️ Running: ${MAVEN_PATH} ${command} -B -ntp`);
 
   if (!fs.existsSync(JAVA_PROJECT_PATH)) {
-    console.log(
+    console.error(
       `❌ ERROR: Java project path does not exist: ${JAVA_PROJECT_PATH}`
     );
     socket.emit(
@@ -44,13 +24,15 @@ export const runMavenCommand = (io: Server, socket: any, command: string) => {
   }
 
   if (!fs.existsSync(`${JAVA_PROJECT_PATH}/pom.xml`)) {
-    console.log(`❌ ERROR: No pom.xml found in ${JAVA_PROJECT_PATH}`);
+    console.error(`❌ ERROR: No pom.xml found in ${JAVA_PROJECT_PATH}`);
     socket.emit(
       "maven-output",
       `❌ ERROR: No pom.xml found in ${JAVA_PROJECT_PATH}`
     );
     return;
   }
+
+  console.log(`▶️ Running: mvn ${command} in ${JAVA_PROJECT_PATH}`);
 
   const childProcess = spawn(MAVEN_PATH, [command, "-B", "-ntp"], {
     cwd: JAVA_PROJECT_PATH,
@@ -73,5 +55,17 @@ export const runMavenCommand = (io: Server, socket: any, command: string) => {
   childProcess.on("close", (code) => {
     console.log(`✅ Maven process exited with code: ${code}`);
     socket.emit("maven-output", `✅ Process exited with code ${code}`);
+
+    // ✅ Only check artifacts after build completes
+    setTimeout(() => {
+      console.log(`🔍 Checking for artifacts in: ${JAVA_PROJECT_PATH}/target`);
+      if (fs.existsSync(`${JAVA_PROJECT_PATH}/target`)) {
+        console.log(
+          `✅ Artifacts directory found: ${JAVA_PROJECT_PATH}/target`
+        );
+      } else {
+        console.warn(`⚠️ No artifacts found at: ${JAVA_PROJECT_PATH}/target`);
+      }
+    }, 2000); // ✅ Give some time for the build to finalize
   });
 };
