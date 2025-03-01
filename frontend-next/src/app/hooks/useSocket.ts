@@ -12,8 +12,10 @@ export const useSocket = () => {
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    // Force WebSocket Reconnection Every Time Component Mounts
-    socketRef.current?.disconnect(); // ✅ Ensure previous socket disconnects before reconnecting
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+
     socketRef.current = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       withCredentials: true,
@@ -39,9 +41,8 @@ export const useSocket = () => {
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
-  }, []); // ✅ Reconnect WebSocket every time component mounts
+  }, []);
 
-  // ✅ Debug WebSocket Emission
   const runMavenCommand = useCallback((command: string) => {
     if (!socketRef.current) {
       console.log("⚠️ WebSocket is not initialized!");
@@ -54,5 +55,5 @@ export const useSocket = () => {
     socketRef.current.emit("run-maven", command);
   }, []);
 
-  return { logs, loading, runMavenCommand };
+  return { logs, setLogs, loading, runMavenCommand, socket: socketRef.current };
 };

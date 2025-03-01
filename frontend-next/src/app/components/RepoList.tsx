@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import GithubIntegration from "./GithubIntegration";
 import CustomToast from "./ui/Toaster";
+import { useSocket } from "../hooks/useSocket";
 
 export default function RepoList() {
   const { data: session } = useSession();
@@ -16,6 +17,8 @@ export default function RepoList() {
     name: string;
     clone_url: string;
   } | null>(null);
+
+  const { setLogs } = useSocket();
 
   useEffect(() => {
     if (!session?.accessToken) return;
@@ -48,6 +51,7 @@ export default function RepoList() {
 
     const result = await response.json();
     setCloning(false);
+    setLogs([]);
     if (response.ok) {
       <CustomToast message={result.message} />;
     } else {

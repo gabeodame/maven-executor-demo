@@ -17,7 +17,7 @@ app.use(
     origin: config.ALLOWED_ORIGINS,
     credentials: true, // ✅ Allows cookies & auth headers
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cache-Control"],
   })
 );
 app.use(express.json());

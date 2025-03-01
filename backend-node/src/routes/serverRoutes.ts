@@ -2,9 +2,9 @@ import express, { Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import { getJavaProjectPath, setJavaProjectPath } from "../config/projectPaths";
+import { getBuildMetrics } from "../services/mavenService";
 
 const router = express.Router();
-const JAVA_PROJECT_PATH = getJavaProjectPath();
 
 // ✅ API to List Artifacts in `target/`
 router.get("/artifacts", (req: Request, res: Response): any => {
@@ -29,6 +29,41 @@ router.get("/artifacts", (req: Request, res: Response): any => {
         path: path.join((req.query.path as string) || "", entry.name), // Preserve relative path
       }));
 
+    return res.json(entries);
+  } catch (error) {
+    console.error("❌ ERROR: Failed to read artifacts:", error);
+    return res.status(500).json({ error: "Failed to read artifacts" });
+  }
+});
+
+router.get("/artifacts", (req: Request, res: Response): any => {
+  const JAVA_PROJECT_PATH = getJavaProjectPath();
+  const requestedPath = req.query.path as string | undefined;
+
+  // ✅ Ensure target directory resolves correctly
+  const targetDir = requestedPath
+    ? path.join(JAVA_PROJECT_PATH, "target", requestedPath) // ✅ Fetch subfolders
+    : path.join(JAVA_PROJECT_PATH, "target"); // ✅ Fetch root artifacts
+
+  console.log(`🔍 Fetching artifacts from: ${targetDir}`);
+
+  if (!fs.existsSync(targetDir)) {
+    console.warn(`⚠️ WARNING: No 'target/' directory found at: ${targetDir}`);
+    return res.json({ warning: "Build artifacts not found." });
+  }
+
+  try {
+    const entries = fs
+      .readdirSync(targetDir, { withFileTypes: true })
+      .map((entry) => ({
+        name: entry.name,
+        isDirectory: entry.isDirectory(),
+        path: requestedPath
+          ? `${requestedPath}/${entry.name}` // ✅ Construct proper relative path
+          : entry.name, // ✅ Root level items remain as is
+      }));
+
+    console.log(`📂 Found ${entries.length} items in: ${targetDir}`);
     return res.json(entries);
   } catch (error) {
     console.error("❌ ERROR: Failed to read artifacts:", error);
@@ -79,9 +114,18 @@ router.post("/set-repo-path", (req: Request, res: Response): any => {
   setJavaProjectPath(repoPath); // ✅ Dynamically update project path
   console.log(`✅ Updated Java project path: ${getJavaProjectPath()}`);
 
+  // ✅ Save path for debugging
+  fs.writeFileSync(
+    "repoPath.log",
+    `JAVA_PROJECT_PATH=${getJavaProjectPath()}\n`
+  );
+
   return res
     .status(200)
     .json({ message: "Repository path updated successfully" });
 });
+
+// ✅ API Endpoint to Fetch Last Build Metrics
+router.get("/build-metrics", getBuildMetrics);
 
 export default router;

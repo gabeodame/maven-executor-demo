@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
+import { useSocket } from "../hooks/useSocket";
 
 interface Artifact {
   name: string;
@@ -11,11 +12,14 @@ interface Artifact {
 
 export default function Artifacts() {
   const { data: session } = useSession();
-  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [builds, setBuilds] = useState<Artifact[]>([]);
   const [loading, setLoading] = useState(true);
+  const [resetting, setResetting] = useState(false);
   const [expandedDirs, setExpandedDirs] = useState<Record<string, Artifact[]>>(
     {}
   );
+
+  const { setLogs, runMavenCommand } = useSocket();
 
   const isProd = process.env.NODE_ENV === "production";
   const backendUrl = isProd
@@ -31,128 +35,177 @@ export default function Artifacts() {
     window.open(downloadUrl, "_blank");
   };
 
-  useEffect(() => {
-    const fetchArtifacts = async (folderPath = "") => {
-      console.log(`🔍 Fetching artifacts from: ${folderPath || "root"}`);
-      try {
-        const res = await fetch(
-          `${backendUrl}/api/artifacts${
-            folderPath ? `?path=${encodeURIComponent(folderPath)}` : ""
-          }`
-        );
-        const data = await res.json();
+  const handleReset = async () => {
+    setResetting(true);
+    console.log("🧹 Resetting workspace...");
+    runMavenCommand("clean");
 
-        if (data.error) {
-          console.warn("⚠️ No artifacts found:", data.error);
-        } else {
-          if (folderPath) {
-            setExpandedDirs((prev) => ({ ...prev, [folderPath]: data }));
-          } else {
-            setArtifacts(data);
-          }
-        }
+    setTimeout(() => {
+      setLogs([]);
+      setResetting(false);
+    }, 1000);
+  };
+
+  useEffect(() => {
+    const fetchBuilds = async () => {
+      console.log(`🔍 Fetching build history...`);
+      try {
+        const res = await fetch(`${backendUrl}/api/artifacts`);
+        const data = await res.json();
+        setBuilds(data);
       } catch (error) {
-        console.error("❌ Error fetching artifacts:", error);
+        console.error("❌ Error fetching builds:", error);
       } finally {
         setLoading(false);
       }
     };
 
     if (!session) return;
-    fetchArtifacts();
+    fetchBuilds();
   }, [session, backendUrl]);
 
-  const toggleExpand = (dirPath: string) => {
+  console.log("🔧 Artifacts:", builds);
+
+  const toggleExpand = async (dirPath: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    console.log("📂 Toggling directory:", dirPath);
+
     if (expandedDirs[dirPath]) {
-      // Collapse if already expanded
       setExpandedDirs((prev) => {
         const newDirs = { ...prev };
         delete newDirs[dirPath];
         return newDirs;
       });
     } else {
-      // Expand by fetching contents
-      fetch(`${backendUrl}/api/artifacts?path=${encodeURIComponent(dirPath)}`)
-        .then((res) => res.json())
-        .then((data) => {
-          setExpandedDirs((prev) => ({ ...prev, [dirPath]: data }));
-        })
-        .catch((error) =>
-          console.error("❌ Error fetching sub-artifacts:", error)
+      console.log(`📂 Fetching contents of: ${dirPath}`);
+      try {
+        const res = await fetch(
+          `${backendUrl}/api/artifacts?path=${encodeURIComponent(dirPath)}`,
+          { method: "GET", headers: { "Cache-Control": "no-cache" } }
         );
+        const data = await res.json();
+
+        console.log(`📂 Subdirectory Contents for ${dirPath}:`, data);
+
+        setExpandedDirs((prev) => ({
+          ...prev,
+          [dirPath]: Array.isArray(data) ? data : [],
+        }));
+      } catch (error) {
+        console.error("❌ Error fetching sub-artifacts:", error);
+      }
     }
   };
 
-  if (loading) return <p>Loading artifacts...</p>;
+  const renderArtifacts = (path: string, artifacts: Artifact[]) => (
+    <ul className="ml-4 mt-2 border-l-2 border-gray-700 pl-3 space-y-1">
+      {artifacts.length > 0 ? (
+        artifacts.map((artifact) => (
+          <li
+            key={artifact.path}
+            className="bg-gray-700 p-2 rounded-md items-start justify-between text-sm hover:bg-gray-600 transition"
+          >
+            {artifact.isDirectory ? (
+              <>
+                <button
+                  onClick={(e) => toggleExpand(artifact.path, e)}
+                  className="w-full flex items-center justify-between text-left hover:text-blue-300 transition"
+                >
+                  <span className="truncate w-full break-words">
+                    {artifact.name}
+                  </span>
+                  {expandedDirs[artifact.path] ? (
+                    <div className="flex items-center gap-0.5">
+                      <span>📂 </span>
+                      <span>▼</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-0.5">
+                      <span>📁 </span>
+                      <span>▶</span>
+                    </div>
+                  )}
+                </button>
+
+                {/* ✅ Render subdirectory contents recursively */}
+                {expandedDirs[artifact.path] &&
+                  renderArtifacts(artifact.path, expandedDirs[artifact.path])}
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleDownload(artifact.path)}
+                className="w-full text-left hover:text-blue-400 truncate break-words transition"
+              >
+                📄 {artifact.name}
+              </button>
+            )}
+          </li>
+        ))
+      ) : (
+        <p className="text-gray-400 pl-4">📂 (Empty folder)</p>
+      )}
+    </ul>
+  );
+
+  if (loading)
+    return <p className="text-center text-gray-400">Loading artifacts...</p>;
 
   return (
-    <div className="w-full mx-auto mt-6 p-4 bg-gray-900 text-white rounded-lg shadow-md overflow-auto">
-      <h2 className="text-xl font-bold mb-4">Build Artifacts</h2>
-      {artifacts.length === 0 ? (
-        <p>
-          No build artifacts found. Run a Maven command to generate artifacts.
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {artifacts.map((artifact) => (
-            <li key={artifact.path} className="bg-gray-800 p-3 rounded-md">
-              {artifact.isDirectory ? (
-                <>
-                  <button
-                    onClick={() => toggleExpand(artifact.path)}
-                    className="w-full text-left flex items-center gap-2 hover:text-blue-400"
-                  >
-                    {expandedDirs[artifact.path] ? "📂 ▼" : "📁 ▶"}{" "}
-                    {artifact.name}
-                  </button>
-                  {expandedDirs[artifact.path] && (
-                    <ul className="ml-6 mt-2 space-y-2">
-                      {expandedDirs[artifact.path].length === 0 ? (
-                        <li className="text-gray-400">📂 (Empty folder)</li>
-                      ) : (
-                        expandedDirs[artifact.path].map((subArtifact) => (
-                          <li
-                            key={subArtifact.path}
-                            className="bg-gray-700 p-2 rounded-md"
-                          >
-                            {subArtifact.isDirectory ? (
-                              <button
-                                onClick={() => toggleExpand(subArtifact.path)}
-                                className="w-full text-left flex items-center gap-2 hover:text-blue-300"
-                              >
-                                {expandedDirs[subArtifact.path]
-                                  ? "📂 ▼"
-                                  : "📁 ▶"}{" "}
-                                {subArtifact.name}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleDownload(subArtifact.path)}
-                                className="hover:text-blue-400"
-                              >
-                                📄 {subArtifact.name}
-                              </button>
-                            )}
-                          </li>
-                        ))
-                      )}
-                    </ul>
-                  )}
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => handleDownload(artifact.path)}
-                  className="hover:text-blue-400"
-                >
-                  📄 {artifact.name}
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+    <div className="w-full max-w-4xl mx-auto p-4 bg-gray-900 text-white rounded-lg shadow-md overflow-hidden">
+      <h2 className="text-2xl font-bold mb-4 text-center">Build Artifacts</h2>
+
+      {builds.length > 0 && (
+        <button
+          type="button"
+          onClick={handleReset}
+          disabled={resetting}
+          className="mb-4 w-full bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md disabled:bg-gray-600 transition"
+        >
+          {resetting ? "🔄 Resetting..." : "🧹 Reset Clean WorkSpace"}
+        </button>
       )}
+
+      <div className="max-h-[60vh] overflow-y-auto pr-2">
+        <ul className="space-y-2 overflow-auto">
+          {builds.length > 0 ? (
+            builds.map((build) => (
+              <li
+                key={build.path}
+                className="bg-gray-800 p-3 rounded-lg shadow overflow-auto"
+              >
+                <button
+                  onClick={(e) => toggleExpand(build.path, e)}
+                  className="w-full flex items-center text-sm text-left font-medium hover:text-blue-400 transition"
+                >
+                  {expandedDirs[build.path] ? (
+                    <div className="flex items-center gap-0.5">
+                      <span>📂 </span>
+                      <span>▼</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-0.5">
+                      <span>📁 </span>
+                      <span>▶</span>
+                    </div>
+                  )}
+                  <span className="truncate w-full break-words">
+                    {build.name}
+                  </span>
+                </button>
+
+                {/* ✅ Render the build contents */}
+                {expandedDirs[build.path] &&
+                  renderArtifacts(build.path, expandedDirs[build.path])}
+              </li>
+            ))
+          ) : (
+            <p className="text-gray-400 text-center">
+              No build artifacts found.
+            </p>
+          )}
+        </ul>
+      </div>
     </div>
   );
 }
