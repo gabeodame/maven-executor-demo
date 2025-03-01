@@ -19,7 +19,7 @@ export default function Artifacts() {
     {}
   );
 
-  const { setLogs, runMavenCommand } = useSocket();
+  const { runMavenCommand } = useSocket();
 
   const isProd = process.env.NODE_ENV === "production";
   const backendUrl = isProd
@@ -31,7 +31,7 @@ export default function Artifacts() {
     const downloadUrl = `${backendUrl}/api/download?file=${encodeURIComponent(
       filePath
     )}`;
-    console.log(`📥 Downloading: ${downloadUrl}`);
+    // console.log(`📥 Downloading: ${downloadUrl}`);
     window.open(downloadUrl, "_blank");
   };
 
@@ -41,7 +41,8 @@ export default function Artifacts() {
     runMavenCommand("clean");
 
     setTimeout(() => {
-      setLogs([]);
+      setBuilds([]);
+      //   setLogs([]);
       setResetting(false);
     }, 1000);
   };
@@ -64,7 +65,8 @@ export default function Artifacts() {
     fetchBuilds();
   }, [session, backendUrl]);
 
-  console.log("🔧 Artifacts:", builds);
+  //   console.log("🔧 Artifacts:", builds);
+  //   console.log("sockect Load status", socketStatus);
 
   const toggleExpand = async (dirPath: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -176,7 +178,7 @@ export default function Artifacts() {
               >
                 <button
                   onClick={(e) => toggleExpand(build.path, e)}
-                  className="w-full flex items-center text-sm text-left font-medium hover:text-blue-400 transition"
+                  className="w-full flex items-center text-sm text-left font-medium hover:text-blue-400 transition disabled:bg-amber-950"
                 >
                   {expandedDirs[build.path] ? (
                     <div className="flex items-center gap-0.5">
@@ -199,6 +201,8 @@ export default function Artifacts() {
                   renderArtifacts(build.path, expandedDirs[build.path])}
               </li>
             ))
+          ) : loading ? (
+            <p className="text-gray-400 text-center">📦 Fetching Artifacts</p>
           ) : (
             <p className="text-gray-400 text-center">
               No build artifacts found.

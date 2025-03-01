@@ -1,22 +1,56 @@
 import { spawn } from "child_process";
-import { MAVEN_PATH } from "../config/paths";
-import { Server } from "socket.io";
+import { Server, Socket } from "socket.io";
 import fs from "fs";
 import path from "path";
 import { getJavaProjectPath } from "../config/projectPaths";
 
-let lastBuildMetrics: Record<string, string | number | null> = {
+let lastBuildMetrics = {
   status: "Unknown",
-  totalTime: null,
-  testsPassed: null,
-  testsFailed: null,
-  errors: null,
-  warnings: null,
+  totalTime: null as string | null,
+  testsPassed: null as string | null,
+  testsFailed: null as string | null,
+  errors: null as string | null,
+  warnings: 0,
 };
 
-export const runMavenCommand = (io: Server, socket: any, command: string) => {
+// ✅ Extract Important Build Metrics from Logs
+const extractBuildMetrics = (log: string, exitCode: number) => {
+  const totalTimeMatch = log.match(/\[INFO\] Total time: ([\d\.]+) s/);
+  const totalTime = totalTimeMatch ? totalTimeMatch[1] : null;
+
+  const testsPassedMatch = log.match(
+    /Tests run: (\d+),\s*Failures: 0,\s*Errors: 0/
+  );
+  const testsPassed = testsPassedMatch ? testsPassedMatch[1] : "0";
+
+  const testsFailedMatch = log.match(/Failures:\s*(\d+)/);
+  const testsFailed = testsFailedMatch ? testsFailedMatch[1] : "0";
+
+  const errorsMatch = log.match(/Errors:\s*(\d+)/);
+  const errors = errorsMatch ? errorsMatch[1] : "0";
+
+  const warningsCount = (log.match(/\[WARNING\]/g) || []).length; // ✅ Proper warning count
+
+  lastBuildMetrics = {
+    status: exitCode === 0 ? "Success" : "Failed",
+    totalTime,
+    testsPassed,
+    testsFailed,
+    errors,
+    warnings: warningsCount,
+  };
+
+  console.log("📊 Updated Build Metrics:", lastBuildMetrics);
+};
+
+// ✅ Run Maven Command and Capture Logs
+export const runMavenCommand = (
+  io: Server,
+  socket: Socket,
+  command: string
+) => {
   const JAVA_PROJECT_PATH = getJavaProjectPath();
-  const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, ""); // Create a unique build ID
+  const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, ""); // Unique build ID
   const buildDir = path.join(JAVA_PROJECT_PATH, "target", `build-${timestamp}`);
 
   console.log(`▶️ Executing Maven in: ${JAVA_PROJECT_PATH}`);
@@ -42,10 +76,12 @@ export const runMavenCommand = (io: Server, socket: any, command: string) => {
     return;
   }
 
-  // Ensure build folder exists
+  // ✅ Ensure build directory exists
   if (!fs.existsSync(buildDir)) {
     fs.mkdirSync(buildDir, { recursive: true });
   }
+
+  let fullLog = "";
 
   const childProcess = spawn("mvn", [command, "-B", "-ntp"], {
     cwd: JAVA_PROJECT_PATH,
@@ -55,12 +91,14 @@ export const runMavenCommand = (io: Server, socket: any, command: string) => {
 
   childProcess.stdout.on("data", (data: Buffer) => {
     const message = data.toString();
+    fullLog += message;
     console.log(`📡 [STDOUT]: ${message}`);
     socket.emit("maven-output", message);
   });
 
   childProcess.stderr.on("data", (data: Buffer) => {
     const errorMessage = data.toString();
+    fullLog += errorMessage;
     console.error(`❌ [STDERR]: ${errorMessage}`);
     socket.emit("maven-output", `❌ ERROR: ${errorMessage}`);
   });
@@ -69,7 +107,11 @@ export const runMavenCommand = (io: Server, socket: any, command: string) => {
     console.log(`✅ Maven process exited with code: ${code}`);
     socket.emit("maven-output", `✅ Process exited with code ${code}`);
 
-    // Move generated artifacts into build-{timestamp} directory
+    // ✅ Extract Build Metrics
+    extractBuildMetrics(fullLog, code || 1);
+    io.emit("build-metrics-updated", lastBuildMetrics); // ✅ Notify all clients
+
+    // ✅ Move generated artifacts into `build-{timestamp}` directory
     const targetDir = path.join(JAVA_PROJECT_PATH, "target");
     if (fs.existsSync(targetDir)) {
       fs.readdirSync(targetDir).forEach((file) => {
@@ -81,26 +123,8 @@ export const runMavenCommand = (io: Server, socket: any, command: string) => {
   });
 };
 
-// ✅ Extract important build metrics from logs
-const extractBuildMetrics = (log: string, exitCode: number) => {
-  const totalTimeMatch = log.match(/\[INFO\] Total time: ([\d\.]+) s/);
-  const totalTime = totalTimeMatch ? totalTimeMatch[1] : "0.0"; // Fix "Unknown" issue
-
-  const metrics = {
-    status: exitCode === 0 ? "Success" : "Failed",
-    totalTime: totalTime, // ✅ Now correctly extracted
-    testsPassed:
-      log.match(/Tests run: (\d+), Failures: 0, Errors: 0/)?.[1] || "0",
-    testsFailed: log.match(/Failures: (\d+)/)?.[1] || "0",
-    errors: log.match(/Errors: (\d+)/)?.[1] || "0",
-    warnings: log.split("WARNING").length - 1, // ✅ Count warning messages
-  };
-
-  console.log("📊 Extracted Build Metrics:", metrics); // ✅ Debug output
-  return metrics;
-};
-
 // ✅ API Endpoint to Fetch Last Build Metrics
 export const getBuildMetrics = (req: any, res: any) => {
+  console.log("📊 Serving Last Build Metrics:", lastBuildMetrics);
   res.json(lastBuildMetrics);
 };

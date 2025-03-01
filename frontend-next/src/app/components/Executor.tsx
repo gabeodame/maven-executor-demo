@@ -10,6 +10,9 @@ import BuildMetrics from "./BuildMetrics";
 const Executor = () => {
   const { logs, loading, runMavenCommand } = useSocket();
 
+  console.log("🔧 Executor rendering...");
+  console.log("🔧 logs:", logs);
+
   return (
     <div className="flex flex-col items-center justify-start min-h-screen w-full p-6 bg-gray-900 text-white">
       {/* Title */}
@@ -46,7 +49,7 @@ const Executor = () => {
 
       {/* Build Metrics & Artifacts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-5xl mt-6">
-        <BuildMetrics />
+        <BuildMetrics logs={logs} />
         <Artifacts />
       </div>
     </div>

@@ -8,23 +8,29 @@ const SOCKET_URL = isDev
 
 export const useSocket = () => {
   const [logs, setLogs] = useState<string[]>([]);
+  const [logsState, setLogsState] = useState<string[]>([]); // ✅ New state for React updates
   const [loading, setLoading] = useState<boolean>(false);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
+    if (socketRef.current) return; // Prevent duplicate connections
 
-    socketRef.current = io(SOCKET_URL, {
+    const socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       withCredentials: true,
     });
 
+    socketRef.current = socket;
     console.log("🔗 WebSocket Connected to:", SOCKET_URL);
 
-    socketRef.current.on("maven-output", (data: string) => {
-      setLogs((prevLogs) => [...prevLogs, data]);
+    socket.on("maven-output", (data: string) => {
+      console.log("📥 Received maven-output log:", data);
+
+      setLogs((prevLogs) => {
+        const newLogs = [...prevLogs, data];
+        console.log("📜 Updated Logs State:", newLogs);
+        return newLogs;
+      });
 
       if (
         data.includes("BUILD SUCCESS") ||
@@ -32,16 +38,26 @@ export const useSocket = () => {
         data.includes("Process exited with code") ||
         data.includes("[INFO] Total time:")
       ) {
-        setTimeout(() => setLoading(false), 500);
+        console.log("✅ Command execution complete.");
+        setLoading(false);
       }
     });
 
+    socket.on("connect", () => console.log("✅ WebSocket connected"));
+    socket.on("disconnect", () => console.log("❌ WebSocket disconnected"));
+
     return () => {
       console.log("❌ Disconnecting WebSocket");
-      socketRef.current?.disconnect();
+      socket.disconnect();
       socketRef.current = null;
     };
   }, []);
+
+  // ✅ Sync logs to logsState so React updates properly
+  useEffect(() => {
+    console.log("🔄 Syncing logsState with logs...");
+    setLogsState(logs);
+  }, [logs]);
 
   const runMavenCommand = useCallback((command: string) => {
     if (!socketRef.current) {
@@ -50,10 +66,18 @@ export const useSocket = () => {
     }
 
     console.log(`▶️ [CLIENT] Sending command to backend: mvn ${command}`);
-    setLogs([`▶️ Executing mvn ${command}...`]);
+
+    setLogs([]); // ✅ Clear logs before running a new command
+    setLogsState([]); // ✅ Clear logsState to force re-render
     setLoading(true);
+
     socketRef.current.emit("run-maven", command);
   }, []);
 
-  return { logs, setLogs, loading, runMavenCommand, socket: socketRef.current };
+  return {
+    logs: logsState,
+    loading,
+    runMavenCommand,
+    socket: socketRef.current,
+  };
 };

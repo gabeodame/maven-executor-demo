@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import GithubIntegration from "./GithubIntegration";
 import CustomToast from "./ui/Toaster";
-import { useSocket } from "../hooks/useSocket";
+// import { useSocket } from "../hooks/useSocket";
 
 export default function RepoList() {
   const { data: session } = useSession();
@@ -13,12 +13,13 @@ export default function RepoList() {
   >([]);
   const [loading, setLoading] = useState(false);
   const [cloning, setCloning] = useState(false);
+  const [cloned, setCloned] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<{
     name: string;
     clone_url: string;
   } | null>(null);
 
-  const { setLogs } = useSocket();
+  //   const { logs } = useSocket();
 
   useEffect(() => {
     if (!session?.accessToken) return;
@@ -54,16 +55,20 @@ export default function RepoList() {
       });
 
       const result = await response.json();
-      setLogs([]);
+      //   setLogs([]);
 
       if (response.ok) {
-        CustomToast({ message: result.message });
+        <CustomToast message="Repository cloned successfully" />;
+        setCloned(true);
       } else {
-        CustomToast({ message: result.error });
+        console.error("❌ Clone error:", result);
+        <CustomToast message="Failed to clone repository" />;
+        setCloned(false);
       }
     } catch (error) {
       console.error("❌ Clone error:", error);
-      CustomToast({ message: "Failed to clone repository" });
+      <CustomToast message="Failed to clone repository" />;
+      setCloned(false);
     } finally {
       setCloning(false);
     }
@@ -92,6 +97,7 @@ export default function RepoList() {
                 (repo) => repo.name === e.target.value
               );
               setSelectedRepo(selected || null);
+              setCloned(false);
             }}
             className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-cyan-500"
           >
@@ -102,17 +108,20 @@ export default function RepoList() {
               </option>
             ))}
           </select>
-
           <button
             onClick={handleClone}
-            disabled={!selectedRepo || cloning}
+            disabled={!selectedRepo || cloning || cloned}
             className={`w-full text-white px-4 py-2 rounded-lg transition-all ${
               cloning
                 ? "bg-gray-600 cursor-not-allowed"
                 : "bg-cyan-900 hover:bg-cyan-800 cursor-pointer"
             }`}
           >
-            {cloning ? "Cloning..." : "Clone Repository"}
+            {cloning
+              ? "Cloning..."
+              : cloned
+              ? `✅ Cloned Complete`
+              : "Clone Repository"}
           </button>
         </div>
       )}
