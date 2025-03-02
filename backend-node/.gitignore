@@ -5,3 +5,7 @@ node_modules/
 dist/
 logs/
 *.log
+
+# Ignore cloned repositories
+repositories/
+workspaces/
