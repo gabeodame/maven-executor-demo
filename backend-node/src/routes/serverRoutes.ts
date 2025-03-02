@@ -4,14 +4,18 @@ import path from "path";
 import { getJavaProjectPath, setJavaProjectPath } from "../config/projectPaths";
 import { getBuildMetrics } from "../services/mavenService";
 
+import unzipper from "unzipper";
+
+import multer from "multer";
+
 const router = express.Router();
 
 // ✅ API to List Artifacts in `target/`
 router.get("/artifacts", (req: Request, res: Response): any => {
   const JAVA_PROJECT_PATH = getJavaProjectPath();
   const targetDir = req.query.path
-    ? path.join(JAVA_PROJECT_PATH, "target", req.query.path as string)
-    : path.join(JAVA_PROJECT_PATH, "target");
+    ? path.join(JAVA_PROJECT_PATH!, "target", req.query.path as string)
+    : path.join(JAVA_PROJECT_PATH!, "target");
 
   console.log(`🔍 Fetching artifacts from: ${targetDir}`);
 
@@ -42,8 +46,8 @@ router.get("/artifacts", (req: Request, res: Response): any => {
 
   // ✅ Ensure target directory resolves correctly
   const targetDir = requestedPath
-    ? path.join(JAVA_PROJECT_PATH, "target", requestedPath) // ✅ Fetch subfolders
-    : path.join(JAVA_PROJECT_PATH, "target"); // ✅ Fetch root artifacts
+    ? path.join(JAVA_PROJECT_PATH!, "target", requestedPath) // ✅ Fetch subfolders
+    : path.join(JAVA_PROJECT_PATH!, "target"); // ✅ Fetch root artifacts
 
   console.log(`🔍 Fetching artifacts from: ${targetDir}`);
 
@@ -81,7 +85,7 @@ router.get("/download", (req: Request, res: Response): any => {
   }
 
   const JAVA_PROJECT_PATH = getJavaProjectPath();
-  const targetDir = path.join(JAVA_PROJECT_PATH, "target");
+  const targetDir = path.join(JAVA_PROJECT_PATH || "", "target");
   const filePath = path.join(targetDir, file); // ✅ Ensure file is inside `target/`
 
   console.log(`🔍 Download request for: ${filePath}`);
@@ -127,5 +131,46 @@ router.post("/set-repo-path", (req: Request, res: Response): any => {
 
 // ✅ API Endpoint to Fetch Last Build Metrics
 router.get("/build-metrics", getBuildMetrics);
+
+// ✅ Configure Multer for file uploads
+const upload = multer({ dest: "/tmp/uploads/" });
+
+router.post(
+  "/upload-java-project",
+  upload.single("file"),
+  async (req, res): Promise<void> => {
+    if (!req.file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+
+    const uploadPath = req.file.path; // Path of the uploaded zip file
+    const extractDir = "/app/demo-java-app";
+
+    try {
+      // ✅ Ensure the extract directory is empty
+      if (fs.existsSync(extractDir)) {
+        fs.rmSync(extractDir, { recursive: true, force: true });
+      }
+      fs.mkdirSync(extractDir, { recursive: true });
+
+      // ✅ Extract the ZIP file
+      await fs
+        .createReadStream(uploadPath)
+        .pipe(unzipper.Extract({ path: extractDir }))
+        .promise();
+      setJavaProjectPath(extractDir);
+
+      console.log(`✅ Extracted Java Project to: ${extractDir}`);
+      res.json({ success: true, path: extractDir });
+    } catch (error) {
+      console.error("❌ Error extracting project:", error);
+      res.status(500).json({ error: "Failed to extract Java project" });
+    } finally {
+      // ✅ Cleanup temp uploaded file
+      fs.unlinkSync(uploadPath);
+    }
+  }
+);
 
 export default router;

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import GithubIntegration from "./GithubIntegration";
 import CustomToast from "./ui/Toaster";
-// import { useSocket } from "../hooks/useSocket";
+import { useRouter } from "next/navigation";
 
 export default function RepoList() {
   const { data: session } = useSession();
@@ -19,12 +19,17 @@ export default function RepoList() {
     clone_url: string;
   } | null>(null);
 
-  //   const { logs } = useSocket();
+  const router = useRouter();
 
+  const backendUrl =
+    process.env.NEXT_PUBLIC_VITE_API_URL ||
+    "https://maven-executor-demo.fly.dev";
+
+  // ✅ Fetch GitHub repos
   useEffect(() => {
     if (!session?.accessToken) return;
 
-    setLoading(true); // ✅ Only set loading when actively fetching
+    setLoading(true);
     fetch("/api/github/repos", {
       headers: { Authorization: `Bearer ${session.accessToken}` },
     })
@@ -35,10 +40,11 @@ export default function RepoList() {
       .catch((err) => {
         console.error("❌ Error fetching repos:", err);
       })
-      .finally(() => setLoading(false)); // ✅ Ensure loading is turned off
+      .finally(() => setLoading(false));
   }, [session]);
 
-  const handleClone = async () => {
+  // ✅ Clone, Zip, & Upload Repo
+  const handleCloneAndUpload = async () => {
     if (!selectedRepo) {
       alert("Please select a repository!");
       return;
@@ -55,19 +61,46 @@ export default function RepoList() {
       });
 
       const result = await response.json();
-      //   setLogs([]);
 
-      if (response.ok) {
-        <CustomToast message="Repository cloned successfully" />;
-        setCloned(true);
-      } else {
+      if (!response.ok) {
         console.error("❌ Clone error:", result);
-        <CustomToast message="Failed to clone repository" />;
+        CustomToast({ message: "Failed to clone repository", type: "error" });
         setCloned(false);
+        return;
       }
+
+      console.log("📦 Repo cloned & zipped, uploading to backend...");
+
+      // ✅ Upload ZIP to backend
+      const formData = new FormData();
+      formData.append("file", result.zipPath); // Path to the ZIP file
+
+      const uploadResponse = await fetch(
+        `${backendUrl}/api/upload-java-project`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!uploadResponse.ok) {
+        console.error("❌ Upload error:", await uploadResponse.json());
+        CustomToast({ message: "Failed to upload repo", type: "error" });
+        setCloned(false);
+        return;
+      }
+
+      CustomToast({
+        message: "Repository cloned & uploaded successfully",
+        type: "success",
+      });
+      setCloned(true);
+
+      // ✅ Reload app to reflect updated Java project path
+      router.refresh();
     } catch (error) {
       console.error("❌ Clone error:", error);
-      <CustomToast message="Failed to clone repository" />;
+      CustomToast({ message: "Failed to clone repository", type: "error" });
       setCloned(false);
     } finally {
       setCloning(false);
@@ -83,7 +116,6 @@ export default function RepoList() {
         Select a Repository
       </h2>
 
-      {/* Show spinner only when fetching repos */}
       {loading ? (
         <div className="flex justify-center items-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white"></div>
@@ -108,8 +140,9 @@ export default function RepoList() {
               </option>
             ))}
           </select>
+
           <button
-            onClick={handleClone}
+            onClick={handleCloneAndUpload}
             disabled={!selectedRepo || cloning || cloned}
             className={`w-full text-white px-4 py-2 rounded-lg transition-all ${
               cloning
@@ -120,8 +153,8 @@ export default function RepoList() {
             {cloning
               ? "Cloning..."
               : cloned
-              ? `✅ Cloned Complete`
-              : "Clone Repository"}
+              ? `✅ Cloned & Uploaded`
+              : "Clone & Upload Repo"}
           </button>
         </div>
       )}

@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# Exit immediately if a command exits with a non-zero status
+set -e
+
+# Ensure NODE_ENV is set properly
+export NODE_ENV=production
+
 # Install Java & Maven
 apk add --no-cache openjdk17 maven
 
@@ -7,7 +13,7 @@ apk add --no-cache openjdk17 maven
 mvn -version || { echo "❌ ERROR: Maven is not installed properly"; exit 1; }
 
 # Install Node.js dependencies
-npm install --production
+npm ci --only=production
 
 # Compile TypeScript (Ensures dist/server.js exists)
 npm run build

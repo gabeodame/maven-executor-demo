@@ -1,11 +1,11 @@
-import path from "path";
+import { getJavaProjectPath } from "./projectPaths";
 import { execSync } from "child_process";
 import fs from "fs";
-import { config } from "./env";
 import { logger } from "../utils/logger";
+import path from "path";
 
 // ✅ Validate Maven Path
-let MAVEN_PATH = config.MAVEN_PATH;
+let MAVEN_PATH = process.env.MAVEN_PATH || "/usr/bin/mvn";
 try {
   MAVEN_PATH = execSync(`realpath ${MAVEN_PATH}`).toString().trim();
   if (!fs.existsSync(MAVEN_PATH)) {
@@ -16,11 +16,8 @@ try {
   process.exit(1);
 }
 
-// ✅ Ensure the correct Java Project Path
-const JAVA_PROJECT_PATH =
-  process.env.NODE_ENV === "production"
-    ? "/app/demo-java-app" // ✅ Path inside container
-    : path.resolve(__dirname, "../../../demo-java-app"); // ✅ Correct Local Path
+// ✅ Always get the latest project path dynamically
+const JAVA_PROJECT_PATH = getJavaProjectPath() || "";
 
 // ✅ Ensure the path exists
 if (!fs.existsSync(path.join(JAVA_PROJECT_PATH, "pom.xml"))) {

@@ -52,7 +52,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       console.log("✅ Repo path updated in backend-node");
       return NextResponse.json({ message: `Cloned ${repoName} successfully` });
     } catch (cloneError) {
-      console.error("❌ Git Clone Failed:", cloneError);
+      console.log("❌ Git Clone Failed:", cloneError);
       return NextResponse.json(
         { error: "Failed to clone repository" },
         { status: 500 }

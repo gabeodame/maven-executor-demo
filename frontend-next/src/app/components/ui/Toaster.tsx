@@ -1,7 +1,13 @@
 import React from "react";
 import { Toaster, toast } from "sonner";
 
-export default function CustomToast({ message }: { message: string }) {
+interface CustomToastProps {
+  message: string;
+
+  type: "success" | "error";
+}
+
+export default function CustomToast({ message }: CustomToastProps) {
   return (
     <div>
       <Toaster />

@@ -50,6 +50,11 @@ export const runMavenCommand = (
   command: string
 ) => {
   const JAVA_PROJECT_PATH = getJavaProjectPath();
+  if (!JAVA_PROJECT_PATH) {
+    console.log(`❌ ERROR: Java project path is undefined`);
+    socket.emit("maven-output", `❌ ERROR: Java project path is undefined`);
+    return;
+  }
   const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, ""); // Unique build ID
   const buildDir = path.join(JAVA_PROJECT_PATH, "target", `build-${timestamp}`);
 

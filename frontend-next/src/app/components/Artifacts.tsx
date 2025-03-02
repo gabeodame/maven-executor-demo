@@ -50,8 +50,10 @@ export default function Artifacts() {
   useEffect(() => {
     const fetchBuilds = async () => {
       console.log(`🔍 Fetching build history...`);
+      const url = `${backendUrl}/api/artifacts`;
+      console.log("🔗 Fetching from:", url);
       try {
-        const res = await fetch(`${backendUrl}/api/artifacts`);
+        const res = await fetch(url);
         const data = await res.json();
         setBuilds(data);
       } catch (error) {

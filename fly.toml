@@ -14,9 +14,10 @@ primary_region = "iad"
 
 [env]
   NODE_ENV = "production"
+  PORT = "8080"
   MAVEN_PATH = "/usr/bin/mvn"
   JAVA_PROJECT_PATH = "/app/demo-java-app"
-  
+  ALLOWED_ORIGINS = "https://maven-executor-demo.vercel.app"
 
 [[vm]]
   memory = "1gb"

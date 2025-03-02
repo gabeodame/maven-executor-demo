@@ -28,7 +28,7 @@ export const useSocket = () => {
 
       setLogs((prevLogs) => {
         const newLogs = [...prevLogs, data];
-        console.log("📜 Updated Logs State:", newLogs);
+        // console.log("📜 Updated Logs State:", newLogs);
         return newLogs;
       });
 
