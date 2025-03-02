@@ -3,42 +3,13 @@ import fs from "fs";
 import path from "path";
 import { getJavaProjectPath, setJavaProjectPath } from "../config/projectPaths";
 import { getBuildMetrics } from "../services/mavenService";
+import { cloneRepository } from "../services/gitService";
 
 import unzipper from "unzipper";
 
 import multer from "multer";
 
 const router = express.Router();
-
-// ✅ API to List Artifacts in `target/`
-router.get("/artifacts", (req: Request, res: Response): any => {
-  const JAVA_PROJECT_PATH = getJavaProjectPath();
-  const targetDir = req.query.path
-    ? path.join(JAVA_PROJECT_PATH!, "target", req.query.path as string)
-    : path.join(JAVA_PROJECT_PATH!, "target");
-
-  console.log(`🔍 Fetching artifacts from: ${targetDir}`);
-
-  if (!fs.existsSync(targetDir)) {
-    console.warn(`⚠️ WARNING: No 'target/' directory found at: ${targetDir}`);
-    return res.json({ warning: "Build artifacts not found." });
-  }
-
-  try {
-    const entries = fs
-      .readdirSync(targetDir, { withFileTypes: true })
-      .map((entry) => ({
-        name: entry.name,
-        isDirectory: entry.isDirectory(),
-        path: path.join((req.query.path as string) || "", entry.name), // Preserve relative path
-      }));
-
-    return res.json(entries);
-  } catch (error) {
-    console.error("❌ ERROR: Failed to read artifacts:", error);
-    return res.status(500).json({ error: "Failed to read artifacts" });
-  }
-});
 
 router.get("/artifacts", (req: Request, res: Response): any => {
   const JAVA_PROJECT_PATH = getJavaProjectPath();
@@ -172,5 +143,34 @@ router.post(
     }
   }
 );
+
+router.get("clone-repo", async (req, res): Promise<any> => {
+  res.json({ message: "Clone Repo" });
+});
+
+router.post("/clone-repo", async (req, res): Promise<any> => {
+  console.log("🔍 Received repository clone request");
+  const { repoUrl } = req.body;
+
+  if (!repoUrl) {
+    return res.status(400).json({ error: "Repository URL is required" });
+  }
+
+  try {
+    const repoPath = cloneRepository(repoUrl);
+
+    if (!repoPath) {
+      return res
+        .status(500)
+        .json({ error: "Failed to determine cloned repo path" });
+    }
+
+    setJavaProjectPath(repoPath);
+    return res.json({ success: true, repoPath });
+  } catch (error) {
+    console.error("❌ Error cloning repository:", error);
+    return res.status(500).json({ error: "Failed to clone repository" });
+  }
+});
 
 export default router;
