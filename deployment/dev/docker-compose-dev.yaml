@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ../.. # ✅ Set to the project root
+      dockerfile: deployment/dev/Dockerfile.dev # ✅ Use relative path for Dockerfile
+    volumes:
+      - ../../backend-node:/app # ✅ Mount backend source code
+      - ../../demo-java-app:/app/demo-java-app # ✅ Mount Java project
+      - /app/node_modules # ✅ Avoid overwriting node_modules
+    ports:
+      - "5001:5001"
+      - "9229:9229"
+    environment:
+      NODE_ENV: development
+    command: npm run dev

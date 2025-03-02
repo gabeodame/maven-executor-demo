@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import GithubIntegration from "./GithubIntegration";
-import CustomToast from "./ui/Toaster";
-import { useRouter } from "next/navigation";
+import { Toaster, toast } from "sonner";
 
 export default function RepoList() {
   const { data: session } = useSession();
@@ -18,12 +17,6 @@ export default function RepoList() {
     name: string;
     clone_url: string;
   } | null>(null);
-
-  const router = useRouter();
-
-  const backendUrl =
-    process.env.NEXT_PUBLIC_VITE_API_URL ||
-    "https://maven-executor-demo.fly.dev";
 
   // ✅ Fetch GitHub repos
   useEffect(() => {
@@ -44,64 +37,52 @@ export default function RepoList() {
   }, [session]);
 
   // ✅ Clone, Zip, & Upload Repo
-  const handleCloneAndUpload = async () => {
+  const handleClone = async () => {
     if (!selectedRepo) {
-      alert("Please select a repository!");
+      toast.error("Please select a repository to clone");
       return;
     }
 
     setCloning(true);
-    console.log("📂 Cloning repo:", selectedRepo.clone_url);
+    console.log("📂 Sending clone request for:", selectedRepo.clone_url);
+
+    const backendUrl =
+      process.env.NEXT_PUBLIC_DEV_URL || process.env.NEXT_PUBLIC_VITE_API_URL;
+
+    if (!backendUrl) {
+      console.error(
+        "❌ Backend URL is not defined. Check environment variables."
+      );
+      toast.error("Internal configuration error: Missing API URL");
+      setCloning(false);
+      return;
+    }
 
     try {
-      const response = await fetch("/api/github/clone", {
+      const url = `${backendUrl}/api/clone-repo`;
+      console.log("🔗 Cloning repository via:", url);
+
+      const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clone_url: selectedRepo.clone_url }),
+        body: JSON.stringify({ repoUrl: selectedRepo.clone_url }),
       });
 
       const result = await response.json();
 
-      if (!response.ok) {
-        console.error("❌ Clone error:", result);
-        CustomToast({ message: "Failed to clone repository", type: "error" });
-        setCloned(false);
-        return;
+      if (response.ok) {
+        console.log("✅ Repository cloned successfully:", result);
+        setCloned(true);
+        toast.success("Repository cloned & uploaded successfully");
+      } else {
+        console.error("❌ Clone error:", result.error || "Unknown error");
+        toast.error(`Clone failed: ${result.error || "Unknown error"}`);
       }
-
-      console.log("📦 Repo cloned & zipped, uploading to backend...");
-
-      // ✅ Upload ZIP to backend
-      const formData = new FormData();
-      formData.append("file", result.zipPath); // Path to the ZIP file
-
-      const uploadResponse = await fetch(
-        `${backendUrl}/api/upload-java-project`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      if (!uploadResponse.ok) {
-        console.error("❌ Upload error:", await uploadResponse.json());
-        CustomToast({ message: "Failed to upload repo", type: "error" });
-        setCloned(false);
-        return;
-      }
-
-      CustomToast({
-        message: "Repository cloned & uploaded successfully",
-        type: "success",
-      });
-      setCloned(true);
-
-      // ✅ Reload app to reflect updated Java project path
-      router.refresh();
     } catch (error) {
       console.error("❌ Clone error:", error);
-      CustomToast({ message: "Failed to clone repository", type: "error" });
-      setCloned(false);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to clone repository: ${errorMessage}`);
     } finally {
       setCloning(false);
     }
@@ -142,7 +123,7 @@ export default function RepoList() {
           </select>
 
           <button
-            onClick={handleCloneAndUpload}
+            onClick={handleClone}
             disabled={!selectedRepo || cloning || cloned}
             className={`w-full text-white px-4 py-2 rounded-lg transition-all ${
               cloning
@@ -153,11 +134,12 @@ export default function RepoList() {
             {cloning
               ? "Cloning..."
               : cloned
-              ? `✅ Cloned & Uploaded`
-              : "Clone & Upload Repo"}
+              ? `✅ Clone Succesful`
+              : "Clone Repository"}
           </button>
         </div>
       )}
+      <Toaster />
     </div>
   );
 }

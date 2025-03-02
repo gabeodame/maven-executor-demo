@@ -1,0 +1,38 @@
+# --- Development Stage ---
+FROM node:20-alpine
+
+# Set environment variables
+ENV NODE_ENV=development
+ENV JAVA_PROJECT_PATH="/app/demo-java-app"
+ENV MAVEN_PATH="/usr/local/bin/mvn"
+
+# Install required dependencies
+RUN apk add --no-cache openjdk17 maven git
+
+# ✅ Ensure Maven is accessible by creating a symlink
+RUN ln -s /usr/bin/mvn /usr/local/bin/mvn
+
+# ✅ Verify installation
+RUN mvn --version
+
+# Set working directory
+WORKDIR /app
+
+# ✅ Copy only package files first for caching
+COPY ../../backend-node/package.json ../../backend-node/package-lock.json ./
+RUN npm install
+
+# Install nodemon globally for live-reloading
+RUN npm install -g nodemon
+
+# ✅ Copy backend source code
+COPY ../../backend-node/. .
+
+# ✅ Copy Java project
+COPY ../../demo-java-app /app/demo-java-app
+
+# Expose API port
+EXPOSE 5001
+
+# Start with nodemon for live-reload
+CMD ["nodemon", "--inspect=0.0.0.0", "--watch", "./src", "server.ts"]
