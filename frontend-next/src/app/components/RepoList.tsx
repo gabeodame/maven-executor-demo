@@ -1,88 +1,121 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import GithubIntegration from "./GithubIntegration";
 import { Toaster, toast } from "sonner";
 
+import { fetchProjects } from "../actions/action";
+
+interface Repository {
+  id: number;
+  name: string;
+  clone_url: string;
+}
+
 export default function RepoList() {
   const { data: session } = useSession();
-  const [repos, setRepos] = useState<
-    { id: number; name: string; clone_url: string }[]
-  >([]);
-  const [loading, setLoading] = useState(false);
-  const [cloning, setCloning] = useState(false);
-  const [cloned, setCloned] = useState(false);
-  const [selectedRepo, setSelectedRepo] = useState<{
-    name: string;
-    clone_url: string;
-  } | null>(null);
+  const [repos, setRepos] = useState<Repository[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [cloning, setCloning] = useState<boolean>(false);
+  const [cloned, setCloned] = useState<boolean>(false);
+  const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
 
-  // ✅ Fetch GitHub repos
-  useEffect(() => {
-    if (!session?.accessToken) return;
+  const backendUrl =
+    process.env.NODE_ENV === "production"
+      ? process.env.NEXT_PUBLIC_VITE_API_URL!
+      : process.env.NEXT_PUBLIC_DEV_URL!;
 
-    setLoading(true);
-    fetch("/api/github/repos", {
-      headers: { Authorization: `Bearer ${session.accessToken}` },
-    })
-      .then((res) => res.json())
-      .then((data) => {
+  const sessionId = session?.user?.id;
+
+  const fetchRepos = useMemo(() => {
+    return async () => {
+      setLoading(true);
+      try {
+        if (!session?.user?.name) {
+          console.log("❌ No session ID found");
+          return;
+        }
+        const res = await fetch("/api/github/repos", {
+          headers: { Authorization: `Bearer ${session.accessToken}` },
+        });
+
+        if (!res.ok) throw new Error(`Failed to fetch repositories`);
+
+        const data: Repository[] = await res.json();
         setRepos(data);
-      })
-      .catch((err) => {
-        console.error("❌ Error fetching repos:", err);
-      })
-      .finally(() => setLoading(false));
+      } catch (error) {
+        console.error("❌ Error fetching repos:", error);
+        toast.error("Failed to load repositories.");
+      } finally {
+        setLoading(false);
+      }
+    };
   }, [session]);
 
-  // ✅ Clone, Zip, & Upload Repo
+  const getProjects = useMemo(
+    () => async () => {
+      if (!sessionId) return;
+      const projects = await fetchProjects(sessionId);
+      if (!projects) return;
+    },
+    [sessionId]
+  );
+  // ✅ Fetch GitHub Repositories on Load
+  useEffect(() => {
+    fetchRepos();
+    getProjects();
+  }, [fetchRepos, getProjects]);
+
+  // ✅ Fetch User's Session ID
+
+  // ✅ Handle Repository Cloning
   const handleClone = async () => {
     if (!selectedRepo) {
-      toast.error("Please select a repository to clone");
-      return;
-    }
-
-    setCloning(true);
-    console.log("📂 Sending clone request for:", selectedRepo.clone_url);
-
-    const backendUrl =
-      process.env.NEXT_PUBLIC_DEV_URL || process.env.NEXT_PUBLIC_VITE_API_URL;
-
-    if (!backendUrl) {
-      console.error(
-        "❌ Backend URL is not defined. Check environment variables."
-      );
-      toast.error("Internal configuration error: Missing API URL");
-      setCloning(false);
+      toast.error("Select a repository to clone");
       return;
     }
 
     try {
-      const url = `${backendUrl}/api/clone-repo`;
-      console.log("🔗 Cloning repository via:", url);
+      if (!sessionId) {
+        console.error("❌ No session ID found");
+        toast.error("Session ID is missing. Please refresh and try again.");
+        return;
+      }
 
-      const response = await fetch(url, {
+      setCloning(true);
+
+      const cloneUrl = `${backendUrl}/api/clone-repo`;
+
+      const response = await fetch(cloneUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoUrl: selectedRepo.clone_url }),
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": sessionId, // ✅ Attach session ID header
+        },
+        body: JSON.stringify({
+          repoUrl: selectedRepo.clone_url,
+          branch: "main",
+          projectName: selectedRepo.name, // ✅ Use repo name as project name
+        }),
       });
 
-      const result = await response.json();
+      if (!response.ok) {
+        throw new Error("Failed to clone repository");
+      }
 
-      if (response.ok) {
-        console.log("✅ Repository cloned successfully:", result);
-        setCloned(true);
-        toast.success("Repository cloned & uploaded successfully");
-      } else {
-        console.error("❌ Clone error:", result.error || "Unknown error");
-        toast.error(`Clone failed: ${result.error || "Unknown error"}`);
+      console.log("✅ Repo cloned successfully for session:", sessionId);
+      setCloned(true);
+      toast.success(`Repository ${selectedRepo.name} cloned successfully`);
+
+      // ✅ Fetch updated project list
+      const projects = await fetchProjects(sessionId);
+      if (projects) {
       }
     } catch (error) {
       console.error("❌ Clone error:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      toast.error(`Failed to clone repository: ${errorMessage}`);
+      toast.error("Failed to clone repository");
+      setCloned(false);
     } finally {
       setCloning(false);
     }
@@ -134,11 +167,12 @@ export default function RepoList() {
             {cloning
               ? "Cloning..."
               : cloned
-              ? `✅ Clone Succesful`
+              ? `✅ Clone Successful`
               : "Clone Repository"}
           </button>
         </div>
       )}
+
       <Toaster />
     </div>
   );

@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useSocket } from "../hooks/useSocket";
+import Accordion from "./ui/Accordion";
 
 interface Artifact {
   name: string;
@@ -12,7 +13,7 @@ interface Artifact {
 
 export default function Artifacts() {
   const { data: session } = useSession();
-  const [builds, setBuilds] = useState<Artifact[]>([]);
+  const [artifacts, setArtifacts] = useState<Record<string, Artifact[]>>({});
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
   const [expandedDirs, setExpandedDirs] = useState<Record<string, Artifact[]>>(
@@ -20,6 +21,7 @@ export default function Artifacts() {
   );
 
   const { runMavenCommand } = useSocket();
+  const sessionId = session?.user?.id;
 
   const isProd = process.env.NODE_ENV === "production";
   const backendUrl = isProd
@@ -31,7 +33,6 @@ export default function Artifacts() {
     const downloadUrl = `${backendUrl}/api/download?file=${encodeURIComponent(
       filePath
     )}`;
-    // console.log(`📥 Downloading: ${downloadUrl}`);
     window.open(downloadUrl, "_blank");
   };
 
@@ -41,37 +42,46 @@ export default function Artifacts() {
     runMavenCommand("clean");
 
     setTimeout(() => {
-      setBuilds([]);
-      //   setLogs([]);
+      setArtifacts({});
       setResetting(false);
     }, 1000);
   };
 
   useEffect(() => {
-    const fetchBuilds = async () => {
-      console.log(`🔍 Fetching build history...`);
+    if (!sessionId) return;
+
+    const fetchArtifacts = async () => {
+      console.log(`🔍 Fetching artifacts for session: ${sessionId}`);
       const url = `${backendUrl}/api/artifacts`;
-      console.log("🔗 Fetching from:", url);
+
       try {
-        const res = await fetch(url);
-        const data = await res.json();
-        setBuilds(data);
+        const res = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "x-session-id": sessionId,
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error(`Server responded with status ${res.status}`);
+        }
+
+        const data: Record<string, Artifact[]> = await res.json();
+        console.log("📂 Fetched Artifacts:", data);
+
+        setArtifacts(data);
       } catch (error) {
-        console.error("❌ Error fetching builds:", error);
+        console.error("❌ Error fetching artifacts:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    if (!session) return;
-    fetchBuilds();
-  }, [session, backendUrl]);
+    fetchArtifacts();
+  }, [sessionId, backendUrl]);
 
-  //   console.log("🔧 Artifacts:", builds);
-  //   console.log("sockect Load status", socketStatus);
-
-  const toggleExpand = async (dirPath: string, event: React.MouseEvent) => {
-    event.stopPropagation();
+  const toggleExpand = async (dirPath: string, projectName: string) => {
     console.log("📂 Toggling directory:", dirPath);
 
     if (expandedDirs[dirPath]) {
@@ -85,7 +95,14 @@ export default function Artifacts() {
       try {
         const res = await fetch(
           `${backendUrl}/api/artifacts?path=${encodeURIComponent(dirPath)}`,
-          { method: "GET", headers: { "Cache-Control": "no-cache" } }
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "no-cache",
+              ...(sessionId && { "x-session-id": sessionId }),
+            },
+          }
         );
         const data = await res.json();
 
@@ -93,7 +110,7 @@ export default function Artifacts() {
 
         setExpandedDirs((prev) => ({
           ...prev,
-          [dirPath]: Array.isArray(data) ? data : [],
+          [`${projectName}/${dirPath}`]: Array.isArray(data) ? data : [],
         }));
       } catch (error) {
         console.error("❌ Error fetching sub-artifacts:", error);
@@ -101,110 +118,97 @@ export default function Artifacts() {
     }
   };
 
-  const renderArtifacts = (path: string, artifacts: Artifact[]) => (
-    <ul className="ml-4 mt-2 border-l-2 border-gray-700 pl-3 space-y-1">
-      {artifacts.length > 0 ? (
-        artifacts.map((artifact) => (
-          <li
-            key={artifact.path}
-            className="bg-gray-700 p-2 rounded-md items-start justify-between text-sm hover:bg-gray-600 transition"
-          >
-            {artifact.isDirectory ? (
-              <>
-                <button
-                  onClick={(e) => toggleExpand(artifact.path, e)}
-                  className="w-full flex items-center justify-between text-left hover:text-blue-300 transition"
-                >
-                  <span className="truncate w-full break-words">
-                    {artifact.name}
-                  </span>
-                  {expandedDirs[artifact.path] ? (
-                    <div className="flex items-center gap-0.5">
-                      <span>📂 </span>
-                      <span>▼</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-0.5">
-                      <span>📁 </span>
-                      <span>▶</span>
-                    </div>
-                  )}
-                </button>
+  const renderArtifacts = (projectName: string, artifacts: Artifact[]) => (
+    <Accordion title={projectName} defaultOpen={false}>
+      <ul className="ml-4 mt-2 border-l-2 border-gray-700 pl-3 space-y-1">
+        {artifacts.length > 0 ? (
+          artifacts.map((artifact) => (
+            <li
+              key={`${projectName}/${artifact.path}`}
+              className="bg-gray-700 p-2 rounded-md text-sm hover:bg-gray-600 transition"
+            >
+              {artifact.isDirectory ? (
+                <>
+                  <button
+                    onClick={() => toggleExpand(artifact.path, projectName)}
+                    className="w-full flex items-center justify-between text-left hover:text-blue-300 transition"
+                  >
+                    <span className="truncate w-full break-words">
+                      {artifact.name}
+                    </span>
+                    {expandedDirs[`${projectName}/${artifact.path}`] ? (
+                      <div className="flex items-center gap-0.5">
+                        <span>📂 </span>
+                        <span>▼</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-0.5">
+                        <span>📁 </span>
+                        <span>▶</span>
+                      </div>
+                    )}
+                  </button>
 
-                {/* ✅ Render subdirectory contents recursively */}
-                {expandedDirs[artifact.path] &&
-                  renderArtifacts(artifact.path, expandedDirs[artifact.path])}
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => handleDownload(artifact.path)}
-                className="w-full text-left hover:text-blue-400 truncate break-words transition"
-              >
-                📄 {artifact.name}
-              </button>
-            )}
-          </li>
-        ))
-      ) : (
-        <p className="text-gray-400 pl-4">📂 (Empty folder)</p>
-      )}
-    </ul>
+                  {/* ✅ Render subdirectory contents recursively */}
+                  {expandedDirs[`${projectName}/${artifact.path}`] &&
+                    renderArtifacts(
+                      projectName,
+                      expandedDirs[`${projectName}/${artifact.path}`]
+                    )}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleDownload(artifact.path)}
+                  className="w-full text-left hover:text-blue-400 truncate break-words transition"
+                >
+                  📄 {artifact.name}
+                </button>
+              )}
+            </li>
+          ))
+        ) : (
+          <p className="text-gray-400 pl-4">📂 (Empty folder)</p>
+        )}
+      </ul>
+    </Accordion>
   );
 
-  if (loading)
+  if (loading) {
     return <p className="text-center text-gray-400">Loading artifacts...</p>;
+  }
 
   return (
     <div className="w-full max-w-4xl mx-auto p-4 bg-gray-900 text-white rounded-lg shadow-md overflow-hidden">
       <h2 className="text-2xl font-bold mb-4 text-center">Build Artifacts</h2>
 
-      {builds.length > 0 && (
+      {Object.keys(artifacts).length > 0 && (
         <button
           type="button"
           onClick={handleReset}
           disabled={resetting}
           className="mb-4 w-full bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md disabled:bg-gray-600 transition"
         >
-          {resetting ? "🔄 Resetting..." : "🧹 Reset Clean WorkSpace"}
+          {resetting ? "🔄 Resetting..." : "🧹 Clean WorkSpace"}
         </button>
       )}
 
       <div className="max-h-[60vh] overflow-y-auto pr-2">
-        <ul className="space-y-2 overflow-auto">
-          {builds.length > 0 ? (
-            builds.map((build) => (
-              <li
-                key={build.path}
-                className="bg-gray-800 p-3 rounded-lg shadow overflow-auto"
-              >
-                <button
-                  onClick={(e) => toggleExpand(build.path, e)}
-                  className="w-full flex items-center text-sm text-left font-medium hover:text-blue-400 transition disabled:bg-amber-950"
+        <ul className="space-y-4">
+          {Object.keys(artifacts).length > 0 ? (
+            Object.entries(artifacts).map(([projectName, projectArtifacts]) => {
+              return (
+                <li
+                  key={projectName}
+                  className="bg-gray-800 p-4 rounded-lg shadow"
                 >
-                  {expandedDirs[build.path] ? (
-                    <div className="flex items-center gap-0.5">
-                      <span>📂 </span>
-                      <span>▼</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-0.5">
-                      <span>📁 </span>
-                      <span>▶</span>
-                    </div>
-                  )}
-                  <span className="truncate w-full break-words">
-                    {build.name}
-                  </span>
-                </button>
-
-                {/* ✅ Render the build contents */}
-                {expandedDirs[build.path] &&
-                  renderArtifacts(build.path, expandedDirs[build.path])}
-              </li>
-            ))
-          ) : loading ? (
-            <p className="text-gray-400 text-center">📦 Fetching Artifacts</p>
+                  {/* <h3 className="text-lg font-semibold text-blue-400">
+                    📁 {projectName}
+                  </h3> */}
+                  {renderArtifacts(projectName, projectArtifacts)}
+                </li>
+              );
+            })
           ) : (
             <p className="text-gray-400 text-center">
               No build artifacts found.

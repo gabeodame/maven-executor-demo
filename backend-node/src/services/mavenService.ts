@@ -2,94 +2,48 @@ import { spawn } from "child_process";
 import { Server, Socket } from "socket.io";
 import fs from "fs";
 import path from "path";
-import { getJavaProjectPath } from "../config/projectPaths";
+import {
+  getJavaProjectPath,
+  initializeSessionWorkspace,
+  setupDefaultProject,
+} from "../config/projectPaths";
+import { extractBuildMetrics, getLastBuildMetrics } from "./metricsService";
 
-let lastBuildMetrics = {
-  status: "Unknown",
-  totalTime: null as string | null,
-  testsPassed: null as string | null,
-  testsFailed: null as string | null,
-  errors: null as string | null,
-  warnings: 0,
-};
+// ✅ Store build metrics per session
+const lastBuildMetrics: Record<string, any> = {};
 
-// ✅ Extract Important Build Metrics from Logs
-const extractBuildMetrics = (log: string, exitCode: number) => {
-  const totalTimeMatch = log.match(/\[INFO\] Total time: ([\d\.]+) s/);
-  const totalTime = totalTimeMatch ? totalTimeMatch[1] : null;
-
-  const testsPassedMatch = log.match(
-    /Tests run: (\d+),\s*Failures: 0,\s*Errors: 0/
-  );
-  const testsPassed = testsPassedMatch ? testsPassedMatch[1] : "0";
-
-  const testsFailedMatch = log.match(/Failures:\s*(\d+)/);
-  const testsFailed = testsFailedMatch ? testsFailedMatch[1] : "0";
-
-  const errorsMatch = log.match(/Errors:\s*(\d+)/);
-  const errors = errorsMatch ? errorsMatch[1] : "0";
-
-  const warningsCount = (log.match(/\[WARNING\]/g) || []).length; // ✅ Proper warning count
-
-  lastBuildMetrics = {
-    status: exitCode === 0 ? "Success" : "Failed",
-    totalTime,
-    testsPassed,
-    testsFailed,
-    errors,
-    warnings: warningsCount,
-  };
-
-  console.log("📊 Updated Build Metrics:", lastBuildMetrics);
-};
-
-// ✅ Run Maven Command and Capture Logs
+/**
+ * ✅ Run Maven Command and Capture Logs
+ */
 export const runMavenCommand = (
   io: Server,
   socket: Socket,
   command: string
 ) => {
-  const JAVA_PROJECT_PATH = getJavaProjectPath();
-  if (!JAVA_PROJECT_PATH) {
-    console.log(`❌ ERROR: Java project path is undefined`);
-    socket.emit("maven-output", `❌ ERROR: Java project path is undefined`);
-    return;
-  }
-  const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, ""); // Unique build ID
-  const buildDir = path.join(JAVA_PROJECT_PATH, "target", `build-${timestamp}`);
+  const sessionId = socket.handshake.auth?.sessionId;
 
-  console.log(`▶️ Executing Maven in: ${JAVA_PROJECT_PATH}`);
-  console.log(`▶️ Running: mvn ${command} -B -ntp`);
-
-  if (!fs.existsSync(JAVA_PROJECT_PATH)) {
-    console.log(
-      `❌ ERROR: Java project path does not exist: ${JAVA_PROJECT_PATH}`
-    );
-    socket.emit(
-      "maven-output",
-      `❌ ERROR: Java project path does not exist: ${JAVA_PROJECT_PATH}`
-    );
+  if (!sessionId) {
+    console.log("❌ ERROR: No session ID provided!");
+    socket.emit("maven-output", "❌ ERROR: No session ID provided!");
     return;
   }
 
-  if (!fs.existsSync(`${JAVA_PROJECT_PATH}/pom.xml`)) {
-    console.log(`❌ ERROR: No pom.xml found in ${JAVA_PROJECT_PATH}`);
-    socket.emit(
-      "maven-output",
-      `❌ ERROR: No pom.xml found in ${JAVA_PROJECT_PATH}`
-    );
-    return;
+  // ✅ Ensure session workspace exists
+  initializeSessionWorkspace(sessionId);
+
+  let projectPath = getJavaProjectPath(sessionId);
+
+  if (!fs.existsSync(path.join(projectPath, "pom.xml"))) {
+    console.log(`⚠️ No valid project found, using default.`);
+    projectPath = setupDefaultProject(sessionId); // ✅ Automatically setup default
   }
 
-  // ✅ Ensure build directory exists
-  if (!fs.existsSync(buildDir)) {
-    fs.mkdirSync(buildDir, { recursive: true });
-  }
+  console.log(`▶️ Running Maven in: ${projectPath}`);
 
   let fullLog = "";
 
   const childProcess = spawn("mvn", [command, "-B", "-ntp"], {
-    cwd: JAVA_PROJECT_PATH,
+    cwd: projectPath,
     env: { ...process.env, PATH: process.env.PATH || "" },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -97,39 +51,39 @@ export const runMavenCommand = (
   childProcess.stdout.on("data", (data: Buffer) => {
     const message = data.toString();
     fullLog += message;
-    console.log(`📡 [STDOUT]: ${message}`);
     socket.emit("maven-output", message);
   });
 
   childProcess.stderr.on("data", (data: Buffer) => {
     const errorMessage = data.toString();
     fullLog += errorMessage;
-    console.error(`❌ [STDERR]: ${errorMessage}`);
     socket.emit("maven-output", `❌ ERROR: ${errorMessage}`);
   });
 
   childProcess.on("close", (code) => {
-    console.log(`✅ Maven process exited with code: ${code}`);
     socket.emit("maven-output", `✅ Process exited with code ${code}`);
 
-    // ✅ Extract Build Metrics
-    extractBuildMetrics(fullLog, code || 1);
-    io.emit("build-metrics-updated", lastBuildMetrics); // ✅ Notify all clients
+    // ✅ Store extracted build metrics per session
+    const buildMetrics = extractBuildMetrics(fullLog, code || 1, sessionId);
+    io.to(sessionId).emit("build-metrics-updated", buildMetrics);
 
-    // ✅ Move generated artifacts into `build-{timestamp}` directory
-    const targetDir = path.join(JAVA_PROJECT_PATH, "target");
-    if (fs.existsSync(targetDir)) {
-      fs.readdirSync(targetDir).forEach((file) => {
-        if (!file.startsWith("build-")) {
-          fs.renameSync(path.join(targetDir, file), path.join(buildDir, file));
-        }
-      });
-    }
+    // ✅ Store it in `lastBuildMetrics` for future API access
+    lastBuildMetrics[sessionId] = buildMetrics;
+
+    console.log(
+      `📊 Updated Build Metrics for session ${sessionId}:`,
+      buildMetrics
+    );
   });
 };
 
-// ✅ API Endpoint to Fetch Last Build Metrics
+/**
+ * ✅ API to Fetch Last Build Metrics for a Session
+ */
 export const getBuildMetrics = (req: any, res: any) => {
-  console.log("📊 Serving Last Build Metrics:", lastBuildMetrics);
-  res.json(lastBuildMetrics);
+  const sessionId = req.headers["x-session-id"];
+  if (!sessionId || !lastBuildMetrics[sessionId]) {
+    return res.json({ error: "No build metrics found for session." });
+  }
+  res.json(lastBuildMetrics[sessionId]);
 };

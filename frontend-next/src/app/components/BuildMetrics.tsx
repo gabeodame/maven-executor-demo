@@ -20,11 +20,11 @@ export default function BuildMetrics({ logs }: { logs: string[] }) {
     warnings: 0,
   });
 
-  console.log("📊 Build Metrics Logs:", logs);
+  //   console.log("📊 Build Metrics Logs:", logs);
   useEffect(() => {
     if (logs?.length === 0) return;
 
-    console.log("📊 Processing logs for Build Metrics...");
+    // console.log("📊 Processing logs for Build Metrics...");
 
     const newMetrics: BuildMetrics = {
       status: "In Progress",
@@ -64,12 +64,12 @@ export default function BuildMetrics({ logs }: { logs: string[] }) {
       }
     });
 
-    console.log("📈 Updated Build Metrics:", newMetrics);
+    // console.log("📈 Updated Build Metrics:", newMetrics);
     setMetrics(newMetrics);
   }, [logs]); // ✅ Reprocess metrics whenever logs update
 
   return (
-    <div className="w-full max-w-lg p-4 bg-gray-900 text-white rounded-lg shadow-md">
+    <div className="w-full md:max-w-lg p-4 bg-gray-900 text-white rounded-lg shadow-md">
       <h2 className="text-xl font-bold mb-4">Build Metrics</h2>
 
       <div className="space-y-2">

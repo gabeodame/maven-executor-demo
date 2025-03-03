@@ -8,11 +8,11 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
       profile(profile) {
         return {
-          id: profile.id.toString(),
-          name: profile.name || profile.login, // ✅ Ensure name falls back to login
+          id: profile.id.toString(), // ✅ Ensure ID is included
+          name: profile.name || profile.login,
           email: profile.email,
           image: profile.avatar_url,
-          username: profile.login, // ✅ Extract username properly
+          username: profile.login,
         };
       },
     }),
@@ -23,15 +23,18 @@ export const authOptions: NextAuthOptions = {
         token.accessToken = account.access_token || null; // ✅ Store GitHub access token
       }
       if (user) {
-        token.username = user.username || null; // ✅ Store GitHub username
+        token.id = user.id; // ✅ Store user ID
+        token.username = user.username || null;
       }
       return token;
     },
     async session({ session, token }) {
-      session.accessToken = token.accessToken || null; // ✅ Ensure accessToken is available
+      session.accessToken = token.accessToken || null;
       if (session.user) {
+        session.user.id = token.id; // ✅ Ensure ID is included in session
         session.user.username = token.username || "Unknown";
       }
+
       return session;
     },
   },

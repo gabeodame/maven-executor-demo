@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
+import { useSession } from "next-auth/react";
 
 const isDev = process.env.NODE_ENV === "development";
 const SOCKET_URL = isDev
@@ -7,38 +8,35 @@ const SOCKET_URL = isDev
   : process.env.NEXT_PUBLIC_VITE_API_URL!;
 
 export const useSocket = () => {
+  const { data: session } = useSession();
   const [logs, setLogs] = useState<string[]>([]);
-  const [logsState, setLogsState] = useState<string[]>([]); // ✅ New state for React updates
   const [loading, setLoading] = useState<boolean>(false);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
+    const sessionId =
+      session?.user?.id || `guest-${Math.random().toString(36).substr(2, 9)}`;
+
     if (socketRef.current) return; // Prevent duplicate connections
 
     const socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       withCredentials: true,
+      auth: { sessionId }, // ✅ Send session ID (user or guest)
     });
 
     socketRef.current = socket;
-    console.log("🔗 WebSocket Connected to:", SOCKET_URL);
+    console.log(
+      "🔗 WebSocket Connected to:",
+      SOCKET_URL,
+      "Session ID:",
+      sessionId
+    );
 
     socket.on("maven-output", (data: string) => {
-      console.log("📥 Received maven-output log:", data);
-
-      setLogs((prevLogs) => {
-        const newLogs = [...prevLogs, data];
-        // console.log("📜 Updated Logs State:", newLogs);
-        return newLogs;
-      });
-
-      if (
-        data.includes("BUILD SUCCESS") ||
-        data.includes("BUILD FAILURE") ||
-        data.includes("Process exited with code") ||
-        data.includes("[INFO] Total time:")
-      ) {
-        console.log("✅ Command execution complete.");
+      console.log("📥 Received Maven Output:", data);
+      setLogs((prevLogs) => [...prevLogs, data]);
+      if (data.includes("BUILD SUCCESS") || data.includes("BUILD FAILURE")) {
         setLoading(false);
       }
     });
@@ -51,13 +49,7 @@ export const useSocket = () => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, []);
-
-  // ✅ Sync logs to logsState so React updates properly
-  useEffect(() => {
-    console.log("🔄 Syncing logsState with logs...");
-    setLogsState(logs);
-  }, [logs]);
+  }, [session]);
 
   const runMavenCommand = useCallback((command: string) => {
     if (!socketRef.current) {
@@ -65,19 +57,13 @@ export const useSocket = () => {
       return;
     }
 
-    console.log(`▶️ [CLIENT] Sending command to backend: mvn ${command}`);
+    console.log(`▶️ [CLIENT] Sending command: mvn ${command}`);
 
-    setLogs([]); // ✅ Clear logs before running a new command
-    setLogsState([]); // ✅ Clear logsState to force re-render
+    setLogs([]);
     setLoading(true);
 
     socketRef.current.emit("run-maven", command);
   }, []);
 
-  return {
-    logs: logsState,
-    loading,
-    runMavenCommand,
-    socket: socketRef.current,
-  };
+  return { logs, loading, runMavenCommand, socket: socketRef.current };
 };
