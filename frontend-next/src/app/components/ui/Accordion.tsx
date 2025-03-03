@@ -7,10 +7,12 @@ import useMeasure from "react-use-measure";
 
 // ✅ Define the props for the Accordion
 interface AccordionProps {
-  title: string;
+  title: string | React.ReactNode;
   children: React.ReactNode;
   defaultOpen?: boolean;
   onClick?: () => void;
+  bgColor?: string;
+  setBgColor?: (color: string) => void;
 }
 
 // ✅ Define the ref type (exposing `toggle` and `isOpen`)
@@ -21,20 +23,25 @@ export interface AccordionHandle {
 
 // ✅ Forward the ref so parent components can control it
 const Accordion = forwardRef<AccordionHandle, AccordionProps>(
-  ({ title, children, defaultOpen = false, onClick }, ref) => {
+  (
+    { title, children, defaultOpen = false, onClick, bgColor = "gray-800" },
+    ref
+  ) => {
     const [refMeasure, { height }] = useMeasure();
     const [open, setOpen] = useState(defaultOpen);
 
     // ✅ Expose methods via ref
+
     useImperativeHandle(ref, () => ({
       toggle: () => setOpen((prev) => !prev),
       isOpen: () => open,
+      bgColor,
     }));
 
     return (
       <motion.div
         animate={open ? "open" : "closed"}
-        className="border-b border-gray-700 bg-gray-800 rounded-lg"
+        className={`bg-${bgColor} rounded-lg shadow-lg `}
       >
         {/* Accordion Header */}
         <button
@@ -44,7 +51,7 @@ const Accordion = forwardRef<AccordionHandle, AccordionProps>(
             setOpen((prev) => !prev);
             onClick?.(); // ✅ Trigger external onClick (API fetch)
           }}
-          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-white text-lg font-medium hover:bg-gray-700 rounded-lg transition"
+          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-white text-lg font-medium hover:bg-gray-700 rounded-lg transition cursor-pointer"
         >
           <motion.span
             variants={{

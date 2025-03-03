@@ -34,7 +34,7 @@ const MavenButton = ({ command, onClick, disabled }: MavenButtonProps) => {
       className={`${getButtonClasses(
         command,
         disabled
-      )} min-w-[100px] max-w-[180px] flex-1`}
+      )} w-full sm:min-w-[100px] sm:max-w-[180px] sm:flex-1`}
     >
       Maven {command.charAt(0).toUpperCase() + command.slice(1)}
     </button>

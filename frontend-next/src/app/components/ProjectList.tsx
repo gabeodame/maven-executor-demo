@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { toast, Toaster } from "sonner";
 import { fetchProjects } from "../actions/action";
 import { useSession } from "next-auth/react";
@@ -20,63 +20,92 @@ function ProjectList() {
   useEffect(() => {
     const getProjects = async () => {
       if (!sessionId) return;
-      const projects = await fetchProjects(sessionId);
-      if (!projects) return;
-      setProjects(projects);
+      const fetchedProjects = await fetchProjects(sessionId);
+      if (!fetchedProjects) return;
+
+      setProjects(fetchedProjects);
 
       // Set first project as active by default
-      if (projects.length > 0 && !selectedProject) {
-        setSelectedProject(projects[0]);
+      if (fetchedProjects.length > 0 && !selectedProject) {
+        setSelectedProject(fetchedProjects[0]);
       }
     };
+
     getProjects();
   }, [sessionId]);
 
-  const handleSelectProject = async (project: string) => {
-    setSelectedProject(project);
+  const handleSelectProject = useCallback(
+    async (project: string) => {
+      setSelectedProject(project);
 
-    try {
-      if (!sessionId) return;
+      try {
+        if (!sessionId) return;
 
-      const response = await fetch(`${backendUrl}/api/select-project`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-session-id": sessionId,
-        },
-        body: JSON.stringify({ projectName: project }),
-      });
+        const response = await fetch(`${backendUrl}/api/select-project`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-session-id": sessionId,
+          },
+          body: JSON.stringify({ projectName: project }),
+        });
 
-      if (!response.ok) {
+        if (!response.ok) {
+          toast.error("Failed to select project.");
+        } else {
+          toast.success(`Project switched to ${project}`);
+        }
+      } catch (error) {
+        console.error("❌ Project selection error:", error);
         toast.error("Failed to select project.");
-      } else {
-        toast.success(`Project switched to ${project}`);
       }
-    } catch (error) {
-      console.error("❌ Project selection error:", error);
-      toast.error("Failed to select project.");
-    }
-  };
+    },
+    [backendUrl, sessionId]
+  );
+
+  // Handle keyboard navigation
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>, index: number) => {
+      if (!projects.length) return;
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        const nextIndex = (index + 1) % projects.length;
+        setSelectedProject(projects[nextIndex]);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        const prevIndex = (index - 1 + projects.length) % projects.length;
+        setSelectedProject(projects[prevIndex]);
+      } else if (event.key === "Enter") {
+        handleSelectProject(selectedProject);
+      }
+    },
+    [projects, selectedProject, handleSelectProject]
+  );
 
   return (
-    <div className="w-full mt-6">
+    <div className="w-full">
       <h3 className="text-lg font-semibold mb-2">Project List</h3>
       <Toaster />
       {projects.length > 0 ? (
-        projects.map((project) => (
-          <div key={project} className="w-full flex gap-2">
-            <span
+        <div className="space-y-2">
+          {projects.map((project, index) => (
+            <div
+              key={project}
               onClick={() => handleSelectProject(project)}
-              className={`w-full text-sm cursor-pointer p-2 text-wrap border-b border-gray-500 transition rounded-md ${
+              onKeyDown={(event) => handleKeyDown(event, index)}
+              role="button"
+              tabIndex={0}
+              className={`w-full text-sm cursor-pointer p-3 rounded-lg border border-gray-600 transition ${
                 selectedProject === project
-                  ? "bg-cyan-900 text-white" // ✅ Active project color
-                  : "hover:bg-cyan-900 hover:text-white"
+                  ? "bg-cyan-900 text-white font-bold shadow-md" // Active project styling
+                  : "hover:bg-cyan-700 hover:text-white"
               }`}
             >
               {project}
-            </span>
-          </div>
-        ))
+            </div>
+          ))}
+        </div>
       ) : (
         <p className="text-gray-400">No projects available.</p>
       )}

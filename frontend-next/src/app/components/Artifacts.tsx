@@ -120,7 +120,7 @@ export default function Artifacts() {
 
   const renderArtifacts = (projectName: string, artifacts: Artifact[]) => (
     <Accordion title={projectName} defaultOpen={false}>
-      <ul className="ml-4 mt-2 border-l-2 border-gray-700 pl-3 space-y-1">
+      <ul className="w-full ml-4 mt-2 border-l-2 border-gray-700 pl-3 space-y-1">
         {artifacts.length > 0 ? (
           artifacts.map((artifact) => (
             <li
@@ -179,7 +179,7 @@ export default function Artifacts() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4 bg-gray-900 text-white rounded-lg shadow-md overflow-hidden">
+    <div className="w-full  max-w-4xl mx-auto p-4 bg-gray-900 text-white rounded-lg shadow-md overflow-hidden">
       <h2 className="text-2xl font-bold mb-4 text-center">Build Artifacts</h2>
 
       {Object.keys(artifacts).length > 0 && (

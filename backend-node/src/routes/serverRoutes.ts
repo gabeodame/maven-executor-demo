@@ -344,4 +344,20 @@ router.get("/user-projects", (req: Request, res: Response): any => {
   }
 });
 
+// API route to get Maven version
+router.get("/maven-version", async (req, res) => {
+  try {
+    const mvnVersionOutput = execSync("mvn -version", {
+      encoding: "utf-8",
+    }).split("\n")[0];
+
+    // Extract only the version number (e.g., "3.9.9")
+    const match = mvnVersionOutput.match(/Apache Maven (\d+\.\d+\.\d+)/);
+    const cleanVersion = match ? `Maven ${match[1]}` : "Maven: Unknown";
+
+    res.json({ version: cleanVersion });
+  } catch (error) {
+    res.json({ version: "Maven: Unknown" });
+  }
+});
 export default router;

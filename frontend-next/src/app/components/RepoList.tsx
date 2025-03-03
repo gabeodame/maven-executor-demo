@@ -1,11 +1,9 @@
 "use client";
-
 import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import GithubIntegration from "./GithubIntegration";
 import { Toaster, toast } from "sonner";
-
-import { fetchProjects } from "../actions/action";
+import Accordion from "./ui/Accordion";
 
 interface Repository {
   id: number;
@@ -28,6 +26,7 @@ export default function RepoList() {
 
   const sessionId = session?.user?.id;
 
+  // Fetch GitHub repositories
   const fetchRepos = useMemo(() => {
     return async () => {
       setLoading(true);
@@ -53,23 +52,12 @@ export default function RepoList() {
     };
   }, [session]);
 
-  const getProjects = useMemo(
-    () => async () => {
-      if (!sessionId) return;
-      const projects = await fetchProjects(sessionId);
-      if (!projects) return;
-    },
-    [sessionId]
-  );
-  // ✅ Fetch GitHub Repositories on Load
+  // Fetch data on mount
   useEffect(() => {
     fetchRepos();
-    getProjects();
-  }, [fetchRepos, getProjects]);
+  }, [fetchRepos]);
 
-  // ✅ Fetch User's Session ID
-
-  // ✅ Handle Repository Cloning
+  // Handle repository cloning
   const handleClone = async () => {
     if (!selectedRepo) {
       toast.error("Select a repository to clone");
@@ -85,18 +73,16 @@ export default function RepoList() {
 
       setCloning(true);
 
-      const cloneUrl = `${backendUrl}/api/clone-repo`;
-
-      const response = await fetch(cloneUrl, {
+      const response = await fetch(`${backendUrl}/api/clone-repo`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-session-id": sessionId, // ✅ Attach session ID header
+          "x-session-id": sessionId,
         },
         body: JSON.stringify({
           repoUrl: selectedRepo.clone_url,
           branch: "main",
-          projectName: selectedRepo.name, // ✅ Use repo name as project name
+          projectName: selectedRepo.name,
         }),
       });
 
@@ -107,11 +93,6 @@ export default function RepoList() {
       console.log("✅ Repo cloned successfully for session:", sessionId);
       setCloned(true);
       toast.success(`Repository ${selectedRepo.name} cloned successfully`);
-
-      // ✅ Fetch updated project list
-      const projects = await fetchProjects(sessionId);
-      if (projects) {
-      }
     } catch (error) {
       console.error("❌ Clone error:", error);
       toast.error("Failed to clone repository");
@@ -122,58 +103,61 @@ export default function RepoList() {
   };
 
   return (
-    <div className="max-w-lg mx-auto mt-10 p-4 bg-gray-900 text-white rounded-lg shadow-md">
-      <div className="w-full mb-4">
-        <GithubIntegration />
+    <Accordion title="GitHub Integration">
+      <div className="max-w-lg mx-auto p-4 bg-gray-900 text-white rounded-lg shadow-md">
+        <div className="w-full mb-4">
+          <GithubIntegration />
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4 text-center">
+          Select a Repository
+        </h2>
+
+        {loading ? (
+          <div className="flex justify-center items-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white"></div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <select
+              value={selectedRepo?.name || ""}
+              onChange={(e) => {
+                const selected = repos.find(
+                  (repo) => repo.name === e.target.value
+                );
+                setSelectedRepo(selected || null);
+                setCloned(false);
+              }}
+              className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-cyan-500"
+            >
+              <option value="">-- Select a Repository --</option>
+              {repos.map((repo) => (
+                <option key={repo.id} value={repo.name} className="bg-blue-700">
+                  {repo.name}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={handleClone}
+              disabled={!selectedRepo || cloning || cloned}
+              className={`w-full text-white px-4 py-2 rounded-lg transition-all ${
+                cloning
+                  ? "bg-gray-600 cursor-not-allowed"
+                  : "bg-cyan-900 hover:bg-cyan-800 cursor-pointer"
+              }`}
+            >
+              {cloning
+                ? "Cloning..."
+                : cloned
+                ? `✅ Clone Successful`
+                : "Clone Repository"}
+            </button>
+          </div>
+        )}
+
+        <Toaster />
       </div>
-      <h2 className="text-2xl font-bold mb-4 text-center">
-        Select a Repository
-      </h2>
-
-      {loading ? (
-        <div className="flex justify-center items-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white"></div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <select
-            value={selectedRepo?.name || ""}
-            onChange={(e) => {
-              const selected = repos.find(
-                (repo) => repo.name === e.target.value
-              );
-              setSelectedRepo(selected || null);
-              setCloned(false);
-            }}
-            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-cyan-500"
-          >
-            <option value="">-- Select a Repository --</option>
-            {repos.map((repo) => (
-              <option key={repo.id} value={repo.name} className="bg-blue-700">
-                {repo.name}
-              </option>
-            ))}
-          </select>
-
-          <button
-            onClick={handleClone}
-            disabled={!selectedRepo || cloning || cloned}
-            className={`w-full text-white px-4 py-2 rounded-lg transition-all ${
-              cloning
-                ? "bg-gray-600 cursor-not-allowed"
-                : "bg-cyan-900 hover:bg-cyan-800 cursor-pointer"
-            }`}
-          >
-            {cloning
-              ? "Cloning..."
-              : cloned
-              ? `✅ Clone Successful`
-              : "Clone Repository"}
-          </button>
-        </div>
-      )}
-
-      <Toaster />
-    </div>
+    </Accordion>
   );
 }

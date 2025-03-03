@@ -13,7 +13,6 @@ export default function GithubIntegration() {
     <div>
       {session ? (
         <div className="flex flex-col items-center gap-2">
-          <h2 className="text-xl font-bold">GitHub Integration</h2>
           <p className="text-sm text-center">
             Select a Java Application to run Maven lifecycle commands against
           </p>

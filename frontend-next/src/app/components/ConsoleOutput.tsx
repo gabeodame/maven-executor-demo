@@ -1,6 +1,5 @@
-interface ConsoleOutputProps {
-  logs: string[];
-}
+"use client";
+import { useSocket } from "../hooks/useSocket";
 
 const getLogColor = (log: string) => {
   if (
@@ -26,9 +25,10 @@ const getLogColor = (log: string) => {
   return "text-gray-300";
 };
 
-const ConsoleOutput = ({ logs }: ConsoleOutputProps) => {
+const ConsoleOutput = () => {
+  const { logs } = useSocket();
   return (
-    <div className="bg-gray-800 text-white p-3 w-full h-full overflow-y-auto font-mono rounded-md border border-gray-700 flex flex-col">
+    <div className="bg-gray-800 text-white p-3 w-full max-w-4xl h-full min-h-[300px] overflow-y-auto font-mono rounded-md border  border-gray-700 flex flex-col">
       {logs.map((log, index) => (
         <div
           key={index}
