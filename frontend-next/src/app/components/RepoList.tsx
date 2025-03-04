@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import GithubIntegration from "./GithubIntegration";
 import { Toaster, toast } from "sonner";
 import Accordion from "./ui/Accordion";
+import { useSessionCache } from "../hooks/useSessionCache";
 
 interface Repository {
   id: number;
@@ -24,7 +25,10 @@ export default function RepoList() {
       ? process.env.NEXT_PUBLIC_VITE_API_URL!
       : process.env.NEXT_PUBLIC_DEV_URL!;
 
-  const sessionId = session?.user?.id;
+  const cachedSessionId = useSessionCache(); // ✅ Use cached session for guests
+  const sessionId = session?.user?.id || cachedSessionId; // ✅ Use actual session ID if available
+
+  console.log("🔒 Session ID:", sessionId);
 
   // Fetch GitHub repositories
   const fetchRepos = useMemo(() => {

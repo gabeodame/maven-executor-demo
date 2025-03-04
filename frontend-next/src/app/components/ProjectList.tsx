@@ -4,9 +4,10 @@ import React, { useEffect, useState, useCallback } from "react";
 import { toast, Toaster } from "sonner";
 
 import { useSession } from "next-auth/react";
+import { useSessionCache } from "../hooks/useSessionCache";
 
 function ProjectList() {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [projects, setProjects] = useState<string[]>([]);
   const backendUrl =
@@ -14,7 +15,8 @@ function ProjectList() {
       ? process.env.NEXT_PUBLIC_VITE_API_URL!
       : process.env.NEXT_PUBLIC_DEV_URL!;
 
-  //   console.log("sessionId", sessionId);
+  const cachedSessionId = useSessionCache(); // ✅ Use cached session for guests
+  const sessionId = session?.user?.id || cachedSessionId; // ✅ Use actual session ID if available
 
   async function fetchProjects(sessionId: string) {
     console.log("📂 Fetching Projects from server action...");
@@ -45,7 +47,6 @@ function ProjectList() {
   useEffect(() => {
     console.log("🔍 Fetching projects...");
     const getProjects = async () => {
-      const sessionId = status === "loading" ? null : session?.user?.id;
       if (!sessionId) return;
       const projectSessionId = sessionId; // ✅ Use "default" if no session
 
@@ -61,11 +62,10 @@ function ProjectList() {
     };
 
     getProjects();
-  }, [session, selectedProject]); // ✅ Will re-run if sessionId updates
+  }, [sessionId, selectedProject]); // ✅ Will re-run if sessionId updates
 
   const handleSelectProject = useCallback(
     async (project: string) => {
-      const sessionId = status === "loading" ? null : session?.user?.id;
       setSelectedProject(project);
 
       try {
@@ -90,7 +90,7 @@ function ProjectList() {
         toast.error("Failed to select project.");
       }
     },
-    [backendUrl, session]
+    [backendUrl, sessionId]
   );
 
   // Handle keyboard navigation
