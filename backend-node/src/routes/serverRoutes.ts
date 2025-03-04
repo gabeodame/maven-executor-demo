@@ -27,6 +27,7 @@ const router = express.Router();
  */
 router.get("/artifacts", (req: Request, res: Response): any => {
   const sessionId = req.headers["x-session-id"] as string;
+  console.log(`📂 Fetching artifacts for session: ${sessionId}`);
 
   if (!sessionId) {
     console.log("❌ ERROR: No session ID provided!");

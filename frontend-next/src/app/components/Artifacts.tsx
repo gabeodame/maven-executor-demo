@@ -1,9 +1,10 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSocket } from "../hooks/useSocket";
 import Accordion from "./ui/Accordion";
+import { useSessionCache } from "../hooks/useSessionCache";
 
 interface Artifact {
   name: string;
@@ -20,8 +21,9 @@ export default function Artifacts() {
     {}
   );
 
-  const { runMavenCommand } = useSocket();
-  const sessionId = session?.user?.id;
+  const { runMavenCommand, loading: socketStatus } = useSocket();
+  const cachedSessionId = useSessionCache(); // ✅ Use cached session for guests
+  const sessionId = session?.user?.id || cachedSessionId; // ✅ Use actual session ID if available
 
   const isProd = process.env.NODE_ENV === "production";
   const backendUrl = isProd
@@ -47,10 +49,12 @@ export default function Artifacts() {
     }, 1000);
   };
 
-  useEffect(() => {
-    if (!sessionId) return;
-
-    const fetchArtifacts = async () => {
+  const fetchArtifacts = useMemo(() => {
+    return async () => {
+      if (!sessionId) {
+        console.warn("⚠️ Waiting for session ID before fetching artifacts...");
+        return;
+      }
       console.log(`🔍 Fetching artifacts for session: ${sessionId}`);
       const url = `${backendUrl}/api/artifacts`;
 
@@ -59,7 +63,7 @@ export default function Artifacts() {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            "x-session-id": sessionId,
+            ...(sessionId && { "x-session-id": sessionId }),
           },
         });
 
@@ -77,14 +81,25 @@ export default function Artifacts() {
         setLoading(false);
       }
     };
+  }, [backendUrl, sessionId]);
 
+  useEffect(() => {
+    if (!sessionId) return;
     fetchArtifacts();
-  }, [sessionId, backendUrl]);
+  }, [sessionId, backendUrl, fetchArtifacts]);
+
+  useEffect(() => {
+    if (socketStatus) return;
+    fetchArtifacts();
+  }, [socketStatus, fetchArtifacts]);
+
+  console.log(socketStatus);
 
   const toggleExpand = async (dirPath: string, projectName: string) => {
-    console.log("📂 Toggling directory:", dirPath);
+    console.log("📂 Toggling directory:", dirPath, projectName);
 
     if (expandedDirs[dirPath]) {
+      // Collapse directory
       setExpandedDirs((prev) => {
         const newDirs = { ...prev };
         delete newDirs[dirPath];
@@ -104,13 +119,14 @@ export default function Artifacts() {
             },
           }
         );
+
         const data = await res.json();
 
         console.log(`📂 Subdirectory Contents for ${dirPath}:`, data);
 
         setExpandedDirs((prev) => ({
           ...prev,
-          [`${projectName}/${dirPath}`]: Array.isArray(data) ? data : [],
+          [dirPath]: Array.isArray(data) ? data : [],
         }));
       } catch (error) {
         console.error("❌ Error fetching sub-artifacts:", error);
@@ -118,42 +134,39 @@ export default function Artifacts() {
     }
   };
 
-  const renderArtifacts = (projectName: string, artifacts: Artifact[]) => (
-    <Accordion title={projectName} defaultOpen={false}>
-      <ul className="w-full ml-4 mt-2 border-l-2 border-gray-700 pl-3 space-y-1">
-        {artifacts.length > 0 ? (
-          artifacts.map((artifact) => (
+  const renderArtifacts = (artifacts: Artifact[], parentPath = "") => (
+    <ul className="ml-4 mt-2 border-l-2 border-gray-700 pl-3 space-y-1">
+      {artifacts.length > 0 ? (
+        artifacts.map((artifact) => {
+          const fullPath = `${parentPath}/${artifact.name}`;
+
+          return (
             <li
-              key={`${projectName}/${artifact.path}`}
+              key={fullPath}
               className="bg-gray-700 p-2 rounded-md text-sm hover:bg-gray-600 transition"
             >
               {artifact.isDirectory ? (
                 <>
                   <button
-                    onClick={() => toggleExpand(artifact.path, projectName)}
+                    onClick={() => toggleExpand(artifact.path, fullPath)}
                     className="w-full flex items-center justify-between text-left hover:text-blue-300 transition"
                   >
                     <span className="truncate w-full break-words">
                       {artifact.name}
                     </span>
-                    {expandedDirs[`${projectName}/${artifact.path}`] ? (
-                      <div className="flex items-center gap-0.5">
-                        <span>📂 </span>
-                        <span>▼</span>
-                      </div>
+                    {expandedDirs[artifact.path] ? (
+                      <span>📂 ▼</span>
                     ) : (
-                      <div className="flex items-center gap-0.5">
-                        <span>📁 </span>
-                        <span>▶</span>
-                      </div>
+                      <span>📁 ▶</span>
                     )}
                   </button>
 
                   {/* ✅ Render subdirectory contents recursively */}
-                  {expandedDirs[`${projectName}/${artifact.path}`] &&
-                    renderArtifacts(
-                      projectName,
-                      expandedDirs[`${projectName}/${artifact.path}`]
+                  {expandedDirs[artifact.path] &&
+                    expandedDirs[artifact.path].length > 0 && (
+                      <div className="ml-5 border-l-2 border-gray-600 pl-3">
+                        {renderArtifacts(expandedDirs[artifact.path], fullPath)}
+                      </div>
                     )}
                 </>
               ) : (
@@ -166,23 +179,20 @@ export default function Artifacts() {
                 </button>
               )}
             </li>
-          ))
-        ) : (
-          <p className="text-gray-400 pl-4">📂 (Empty folder)</p>
-        )}
-      </ul>
-    </Accordion>
+          );
+        })
+      ) : (
+        <p className="text-gray-400 pl-4">📂 (Empty folder)</p>
+      )}
+    </ul>
   );
-
-  console.log("📂 Artifacts:", artifacts);
-  console.log("loading", loading);
 
   if (loading) {
     return <p className="text-center text-gray-400">Loading artifacts...</p>;
   }
 
   return (
-    <div className="w-full  max-w-4xl mx-auto p-4 bg-gray-900 text-white rounded-lg shadow-md overflow-hidden">
+    <div className="w-full max-w-4xl mx-auto p-4 bg-gray-900 text-white rounded-lg shadow-md overflow-hidden">
       <h2 className="text-2xl font-bold mb-4 text-center">Build Artifacts</h2>
 
       {Object.keys(artifacts).length > 0 && (
@@ -205,10 +215,9 @@ export default function Artifacts() {
                   key={projectName}
                   className="bg-gray-800 p-4 rounded-lg shadow"
                 >
-                  {/* <h3 className="text-lg font-semibold text-blue-400">
-                    📁 {projectName}
-                  </h3> */}
-                  {renderArtifacts(projectName, projectArtifacts)}
+                  <Accordion title={`📁 ${projectName}`} defaultOpen={false}>
+                    {renderArtifacts(projectArtifacts, projectName)}
+                  </Accordion>
                 </li>
               );
             })

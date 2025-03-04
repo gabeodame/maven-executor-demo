@@ -11,14 +11,18 @@ const Executor = () => {
   };
 
   return (
-    <div className=" w-full flex flex-col sm:flex-row sm:flex-wrap justify-center gap-3">
+    <div className="w-full flex flex-wrap justify-center gap-2 sm:gap-3">
       {["validate", "compile", "test", "package", "clean"].map((cmd) => (
-        <MavenButton
+        <div
           key={cmd}
-          command={cmd}
-          onClick={() => handleRunCommand(cmd)}
-          disabled={loading}
-        />
+          className="w-full sm:w-auto flex-1 min-w-[100px] max-w-[180px]"
+        >
+          <MavenButton
+            command={cmd}
+            onClick={() => handleRunCommand(cmd)}
+            disabled={loading}
+          />
+        </div>
       ))}
     </div>
   );

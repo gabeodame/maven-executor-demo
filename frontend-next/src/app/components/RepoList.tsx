@@ -107,8 +107,12 @@ export default function RepoList() {
   };
 
   return (
-    <Accordion title="GitHub Integration">
-      <div className="max-w-lg mx-auto p-4 bg-gray-900 text-white rounded-lg shadow-md">
+    <Accordion
+      title="GitHub Integration"
+      bgColor="bg-gray-500"
+      hoverColor="hover:bg-gray-600"
+    >
+      <div className="max-w-lg mx-auto p-4  text-white rounded-lg shadow-md">
         <div className="w-full mb-4">
           <GithubIntegration />
         </div>

@@ -8,7 +8,7 @@ interface MavenButtonProps {
 
 const getButtonClasses = (cmd: string, disabled: boolean) => {
   const baseClasses =
-    "px-4 py-2 text-white text-sm font-medium rounded-md transition-all duration-200";
+    "px-4 py-2 text-white text-sm sm:text-base md:text-lg font-medium rounded-md transition-all duration-200";
   const disabledClasses = "bg-gray-500 cursor-not-allowed opacity-70";
 
   const colorClasses = disabled
@@ -34,7 +34,7 @@ const MavenButton = ({ command, onClick, disabled }: MavenButtonProps) => {
       className={`${getButtonClasses(
         command,
         disabled
-      )} w-full sm:min-w-[100px] sm:max-w-[180px] sm:flex-1`}
+      )} w-full sm:w-auto min-w-[100px] max-w-[180px] flex-1`}
     >
       Maven {command.charAt(0).toUpperCase() + command.slice(1)}
     </button>

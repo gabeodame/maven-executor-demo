@@ -12,6 +12,7 @@ interface AccordionProps {
   defaultOpen?: boolean;
   onClick?: () => void;
   bgColor?: string;
+  hoverColor?: string;
   setBgColor?: (color: string) => void;
 }
 
@@ -24,7 +25,14 @@ export interface AccordionHandle {
 // ✅ Forward the ref so parent components can control it
 const Accordion = forwardRef<AccordionHandle, AccordionProps>(
   (
-    { title, children, defaultOpen = false, onClick, bgColor = "gray-800" },
+    {
+      title,
+      children,
+      defaultOpen = false,
+      onClick,
+      bgColor = "bg-gray-800",
+      hoverColor = "bg-gray-900",
+    },
     ref
   ) => {
     const [refMeasure, { height }] = useMeasure();
@@ -41,7 +49,7 @@ const Accordion = forwardRef<AccordionHandle, AccordionProps>(
     return (
       <motion.div
         animate={open ? "open" : "closed"}
-        className={`bg-${bgColor} rounded-lg shadow-lg `}
+        className={`${bgColor} ${hoverColor} rounded-lg shadow-lg ease-in-out transition-all`}
       >
         {/* Accordion Header */}
         <button
@@ -51,7 +59,7 @@ const Accordion = forwardRef<AccordionHandle, AccordionProps>(
             setOpen((prev) => !prev);
             onClick?.(); // ✅ Trigger external onClick (API fetch)
           }}
-          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-white text-lg font-medium hover:bg-gray-700 rounded-lg transition cursor-pointer"
+          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-white text-lg font-medium rounded-lg transition cursor-pointer"
         >
           <motion.span
             variants={{

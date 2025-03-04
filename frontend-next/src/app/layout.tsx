@@ -4,6 +4,7 @@ import "./globals.css";
 import SessionProvider from "./components/SessionProvider";
 import Footer from "./components/Footer";
 import MobileMenu from "./components/Menu";
+import { MenuProvider } from "./store/MenuContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,19 +32,21 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col`}
       >
         <SessionProvider>
-          {/* Header (Mobile Menu Inside) */}
-          <header className="w-full h-16 flex justify-between items-center bg-gray-800 shadow-md text-white px-4">
-            <h1 className="text-lg sm:text-2xl font-bold flex items-center gap-2">
-              📦 Maven Command Executor
-            </h1>
-            <MobileMenu />
-          </header>
+          <MenuProvider>
+            {/* Header (Mobile Menu Inside) */}
+            <header className="w-full h-16 flex justify-between items-center bg-gray-800 shadow-md text-white px-4">
+              <h1 className="text-lg sm:text-2xl font-bold flex items-center gap-2">
+                📦 Maven Command Executor
+              </h1>
+              <MobileMenu />
+            </header>
 
-          {/* Main Content (Auto-Grows) */}
-          <main className="flex-grow bg-gray-900">{children}</main>
+            {/* Main Content (Auto-Grows) */}
+            <main className="flex-grow bg-gray-900">{children}</main>
 
-          {/* Fixed Footer */}
-          <Footer />
+            {/* Fixed Footer */}
+            <Footer />
+          </MenuProvider>
         </SessionProvider>
       </body>
     </html>
