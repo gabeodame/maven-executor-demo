@@ -29,9 +29,12 @@ export default function GithubIntegration() {
       ) : (
         <button
           onClick={() => signIn("github")}
-          className="w-full flex items-center justify-center gap-2 cursor-pointer bg-blue-500 text-white px-4 py-2 rounded-md"
+          className="w-full flex flex-col items-center justify-center gap-2 cursor-pointer bg-cyan-800 hover:bg-cyan-900 ease-in transition-all text-white px-4 py-2 rounded-md"
         >
-          Sign in with GitHub <FaGithub />
+          <div className="flex items-center gap-1 text-nowrap text-sm">
+            <span>Sign in with GitHub</span>
+            <FaGithub />
+          </div>
         </button>
       )}
     </div>

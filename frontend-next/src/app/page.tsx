@@ -27,7 +27,7 @@ export default function Home() {
       </aside>
 
       {/* Main Section (60%) */}
-      <section className="flex flex-col gap-6 p-4 w-full overflow-hidden">
+      <section className="flex flex-col gap-6 p-4 w-full min-h-full overflow-hidden">
         <div className="w-full flex flex-col lg:grid lg:grid-cols-[60%_40%] gap-6">
           {/* Left side of Main (Buttons & Console Output) */}
           <div className="flex flex-col gap-6 w-full">
@@ -39,7 +39,7 @@ export default function Home() {
               <h3 className="text-lg font-semibold text-center mb-2">
                 Console Output
               </h3>
-              <div className="flex-1 overflow-y-auto bg-gray-900 p-3 rounded-md">
+              <div className="flex-1 overflow-hidden bg-gray-900 p-3 rounded-md">
                 <ConsoleOutput />
               </div>
             </div>

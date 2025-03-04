@@ -174,6 +174,9 @@ export default function Artifacts() {
     </Accordion>
   );
 
+  console.log("📂 Artifacts:", artifacts);
+  console.log("loading", loading);
+
   if (loading) {
     return <p className="text-center text-gray-400">Loading artifacts...</p>;
   }

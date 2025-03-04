@@ -2,11 +2,11 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { toast, Toaster } from "sonner";
-import { fetchProjects } from "../actions/action";
+
 import { useSession } from "next-auth/react";
 
 function ProjectList() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [projects, setProjects] = useState<string[]>([]);
   const backendUrl =
@@ -14,28 +14,58 @@ function ProjectList() {
       ? process.env.NEXT_PUBLIC_VITE_API_URL!
       : process.env.NEXT_PUBLIC_DEV_URL!;
 
-  const sessionId = session?.user?.id;
+  //   console.log("sessionId", sessionId);
+
+  async function fetchProjects(sessionId: string) {
+    console.log("📂 Fetching Projects from server action...");
+    if (!sessionId) return;
+
+    try {
+      const backendUrl =
+        process.env.NODE_ENV === "production"
+          ? process.env.NEXT_PUBLIC_VITE_API_URL!
+          : process.env.NEXT_PUBLIC_DEV_URL!;
+      const res = await fetch(`${backendUrl}/api/user-projects`, {
+        headers: {
+          "x-session-id": sessionId,
+        },
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch projects");
+
+      const projectList: string[] = await res.json();
+      console.log("📂 Fetched Projects:", projectList);
+      return projectList;
+    } catch (error) {
+      console.error("❌ Error fetching projects:", error);
+    }
+  }
 
   // Fetch projects on component mount
   useEffect(() => {
+    console.log("🔍 Fetching projects...");
     const getProjects = async () => {
+      const sessionId = status === "loading" ? null : session?.user?.id;
       if (!sessionId) return;
-      const fetchedProjects = await fetchProjects(sessionId);
+      const projectSessionId = sessionId; // ✅ Use "default" if no session
+
+      const fetchedProjects = await fetchProjects(projectSessionId);
       if (!fetchedProjects) return;
 
       setProjects(fetchedProjects);
 
-      // Set first project as active by default
+      // ✅ Set first project as active by default
       if (fetchedProjects.length > 0 && !selectedProject) {
         setSelectedProject(fetchedProjects[0]);
       }
     };
 
     getProjects();
-  }, [sessionId]);
+  }, [session, selectedProject]); // ✅ Will re-run if sessionId updates
 
   const handleSelectProject = useCallback(
     async (project: string) => {
+      const sessionId = status === "loading" ? null : session?.user?.id;
       setSelectedProject(project);
 
       try {
@@ -60,7 +90,7 @@ function ProjectList() {
         toast.error("Failed to select project.");
       }
     },
-    [backendUrl, sessionId]
+    [backendUrl, session]
   );
 
   // Handle keyboard navigation

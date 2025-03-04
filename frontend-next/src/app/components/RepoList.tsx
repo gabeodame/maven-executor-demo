@@ -141,10 +141,10 @@ export default function RepoList() {
             <button
               onClick={handleClone}
               disabled={!selectedRepo || cloning || cloned}
-              className={`w-full text-white px-4 py-2 rounded-lg transition-all ${
+              className={`w-full text-white px-4 py-2 rounded-lg ease-in transition-all ${
                 cloning
                   ? "bg-gray-600 cursor-not-allowed"
-                  : "bg-cyan-900 hover:bg-cyan-800 cursor-pointer"
+                  : "bg-cyan-800 hover:bg-cyan-900 cursor-pointer"
               }`}
             >
               {cloning
