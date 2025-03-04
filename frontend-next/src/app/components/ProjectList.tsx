@@ -5,6 +5,7 @@ import { toast, Toaster } from "sonner";
 
 import { useSession } from "next-auth/react";
 import { useSessionCache } from "../hooks/useSessionCache";
+// import { useArtifacts } from "../hooks/useFetchArtifacts";
 
 function ProjectList() {
   const { data: session } = useSession();
@@ -14,6 +15,8 @@ function ProjectList() {
     process.env.NODE_ENV === "production"
       ? process.env.NEXT_PUBLIC_VITE_API_URL!
       : process.env.NEXT_PUBLIC_DEV_URL!;
+
+  // const { fetchArtifacts } = useArtifacts();
 
   const cachedSessionId = useSessionCache(); // ✅ Use cached session for guests
   const sessionId = session?.user?.id || cachedSessionId; // ✅ Use actual session ID if available

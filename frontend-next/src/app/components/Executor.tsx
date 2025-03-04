@@ -6,8 +6,9 @@ const Executor = () => {
   const { loading, runMavenCommand } = useSocket();
 
   const handleRunCommand = (cmd: string) => {
-    console.log("cmd", cmd);
+    console.log("🎯 handleRunCommand triggered for:", cmd);
     runMavenCommand(cmd);
+    console.log("✅ runMavenCommand called for:", cmd);
   };
 
   return (

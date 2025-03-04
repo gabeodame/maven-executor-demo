@@ -34,7 +34,7 @@ const MavenDebugTools = () => {
                 : "bg-blue-600 hover:bg-blue-700"
             }`}
           >
-            {loading && selectedCommand === cmd ? "Running..." : `Maven ${cmd}`}
+            {loading && selectedCommand === cmd ? "Running..." : `${cmd}`}
           </button>
         ))}
       </div>

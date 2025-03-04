@@ -22,12 +22,7 @@ class SocketService {
       auth: { sessionId },
     });
 
-    console.log(
-      "🔗 WebSocket Connected to:",
-      SOCKET_URL,
-      "Session ID:",
-      sessionId
-    );
+    console.log("🛠️ SocketService initialized with session:", sessionId);
 
     if (!this.listenersAdded) {
       this.socket.on("maven-output", (data: string) => {
@@ -97,10 +92,14 @@ class SocketService {
   }
 
   public runMavenCommand(command: string) {
+    console.log("🔧 Running Maven Command before sessionId check:", command);
+
     if (!this.sessionId) {
       console.error("❌ ERROR: No session ID available!");
       return;
     }
+
+    console.log("🔧 Running Maven Command after sessionId check:", command);
 
     this.clearLogs();
     this.logs.push(`▶️ [CLIENT] Sending command: mvn ${command}`);

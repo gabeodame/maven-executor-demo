@@ -20,6 +20,7 @@ export const runMavenCommand = (
   socket: Socket,
   command: string
 ) => {
+  console.log(`▶️ Running Maven Command: ${command}`);
   const sessionId = socket.handshake.auth?.sessionId;
 
   if (!sessionId) {

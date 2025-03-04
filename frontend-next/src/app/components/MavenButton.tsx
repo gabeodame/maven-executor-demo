@@ -36,7 +36,7 @@ const MavenButton = ({ command, onClick, disabled }: MavenButtonProps) => {
         disabled
       )} w-full sm:w-auto min-w-[100px] max-w-[180px] flex-1`}
     >
-      Maven {command.charAt(0).toUpperCase() + command.slice(1)}
+      {command.charAt(0).toUpperCase() + command.slice(1)}
     </button>
   );
 };

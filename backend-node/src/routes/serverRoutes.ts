@@ -271,6 +271,11 @@ router.post("/select-project", (req: Request, res: Response): any => {
   const { projectName } = req.body;
   const sessionId = req.headers["x-session-id"] as string;
 
+  console.log(
+    "🔍 Received project selection request:",
+    `${projectName}-${sessionId}`
+  );
+
   if (!sessionId || !projectName) {
     return res
       .status(400)

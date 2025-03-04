@@ -1,10 +1,11 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState, useEffect, useMemo } from "react";
+import { useState } from "react";
 import { useSocket } from "../hooks/useSocket";
 import Accordion from "./ui/Accordion";
 import { useSessionCache } from "../hooks/useSessionCache";
+import { useArtifacts } from "../hooks/useFetchArtifacts";
 
 interface Artifact {
   name: string;
@@ -14,14 +15,15 @@ interface Artifact {
 
 export default function Artifacts() {
   const { data: session } = useSession();
-  const [artifacts, setArtifacts] = useState<Record<string, Artifact[]>>({});
-  const [loading, setLoading] = useState(true);
+  // const [artifacts, setArtifacts] = useState<Record<string, Artifact[]>>({});
   const [resetting, setResetting] = useState(false);
   const [expandedDirs, setExpandedDirs] = useState<Record<string, Artifact[]>>(
     {}
   );
 
-  const { runMavenCommand, loading: socketStatus } = useSocket();
+  const { loading, artifacts, setArtifacts } = useArtifacts();
+
+  const { runMavenCommand } = useSocket();
   const cachedSessionId = useSessionCache(); // ✅ Use cached session for guests
   const sessionId = session?.user?.id || cachedSessionId; // ✅ Use actual session ID if available
 
@@ -43,57 +45,16 @@ export default function Artifacts() {
     console.log("🧹 Resetting workspace...");
     runMavenCommand("clean");
 
-    setTimeout(() => {
+    if (!loading) {
       setArtifacts({});
       setResetting(false);
-    }, 1000);
+    }
   };
 
-  const fetchArtifacts = useMemo(() => {
-    return async () => {
-      if (!sessionId) {
-        console.warn("⚠️ Waiting for session ID before fetching artifacts...");
-        return;
-      }
-      console.log(`🔍 Fetching artifacts for session: ${sessionId}`);
-      const url = `${backendUrl}/api/artifacts`;
-
-      try {
-        const res = await fetch(url, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            ...(sessionId && { "x-session-id": sessionId }),
-          },
-        });
-
-        if (!res.ok) {
-          throw new Error(`Server responded with status ${res.status}`);
-        }
-
-        const data: Record<string, Artifact[]> = await res.json();
-        console.log("📂 Fetched Artifacts:", data);
-
-        setArtifacts(data);
-      } catch (error) {
-        console.error("❌ Error fetching artifacts:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-  }, [backendUrl, sessionId]);
-
-  useEffect(() => {
-    if (!sessionId) return;
-    fetchArtifacts();
-  }, [sessionId, backendUrl, fetchArtifacts]);
-
-  useEffect(() => {
-    if (socketStatus) return;
-    fetchArtifacts();
-  }, [socketStatus, fetchArtifacts]);
-
-  console.log(socketStatus);
+  // useEffect(() => {
+  //   if (!sessionId) return;
+  //   fetchArtifacts();
+  // }, [sessionId, backendUrl, fetchArtifacts]);
 
   const toggleExpand = async (dirPath: string, projectName: string) => {
     console.log("📂 Toggling directory:", dirPath, projectName);

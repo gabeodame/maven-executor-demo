@@ -14,6 +14,8 @@ const MobileMenu = () => {
   // const [isOpen, setIsOpen] = useState(false);
   const { isOpen, toggleMenu } = useMenu();
 
+  console.log("MobileMenu -> isOpen", isOpen);
+
   return (
     <>
       {/* Prevent background scroll when menu is open */}
