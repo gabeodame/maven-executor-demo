@@ -124,10 +124,10 @@ export default function RootLayout({
             }),
           }}
         />
-        <Script
+        <script
           async
-          strategy="afterInteractive"
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2067270214726984"
+          crossOrigin="anonymous" // ✅ Fix: Use camelCase
         />
       </head>
       <body
