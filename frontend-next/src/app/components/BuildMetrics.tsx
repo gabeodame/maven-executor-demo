@@ -71,7 +71,7 @@ export default function BuildMetrics() {
   }, [logs]); // ✅ Reprocess metrics whenever logs update
 
   return (
-    <div className="w-full p-4 bg-gray-900 text-white rounded-lg shadow-md">
+    <div className="w-full max-w-[350px] p-4 bg-gray-900 text-white rounded-lg shadow-md text-center">
       <h2 className="text-xl font-bold mb-4">Build Metrics</h2>
 
       <div className="w-full space-y-2">

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSocket } from "../hooks/useSocket";
 import Accordion from "./ui/Accordion";
 import { useMenu } from "../store/MenuContext";
+import { useIsMobile } from "../hooks/useIsMobile"; // ✅ Import the new hook
 
 const pipelines = [
   { name: "Full Build", commands: ["clean", "compile", "package", "install"] },
@@ -19,12 +20,14 @@ const MavenPipeline = () => {
   const { loading, runMavenCommand } = useSocket();
   const [runningPipeline, setRunningPipeline] = useState<string | null>(null);
   const { toggleMenu } = useMenu();
+  const isMobile = useIsMobile(); // ✅ Use the hook
 
   const handleRunPipeline = async (pipeline: {
     name: string;
     commands: string[];
   }) => {
-    toggleMenu();
+    if (isMobile) toggleMenu(); // ✅ Only toggle menu on mobile/tablet
+
     setRunningPipeline(pipeline.name);
     for (const cmd of pipeline.commands) {
       runMavenCommand(cmd, "pipeline");

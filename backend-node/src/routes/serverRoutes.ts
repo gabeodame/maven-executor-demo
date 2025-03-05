@@ -60,11 +60,35 @@ const cleanOldBuilds = (targetPath: string) => {
 
 router.get("/artifacts", (req: Request, res: Response): any => {
   const sessionId = req.headers["x-session-id"] as string;
+  const requestedPath = req.query.path as string; // Subdirectory path
+
+  console.log(`📂 Fetching artifacts for session: ${sessionId}`);
+
+  if (!sessionId) {
+    console.log("❌ ERROR: No session ID provided!");
+    return res.status(400).json({ error: "Session ID is required" });
+  }
+
   const sessionWorkspace = path.join("/app/workspaces", sessionId);
+  if (!fs.existsSync(sessionWorkspace)) {
+    console.log(`⚠️ WARNING: No workspace found for session ${sessionId}`);
+    return res.json([]);
+  }
 
-  if (!sessionId) return res.status(400).json({ error: "Session ID required" });
-  if (!fs.existsSync(sessionWorkspace)) return res.json([]);
+  // If a specific path is requested, return its contents directly
+  if (requestedPath) {
+    if (!fs.existsSync(requestedPath)) {
+      console.log(
+        `⚠️ WARNING: Requested path does not exist: ${requestedPath}`
+      );
+      return res.json([]);
+    }
 
+    console.log(`📂 Fetching contents of subdirectory: ${requestedPath}`);
+    return res.json(getArtifactsRecursively(requestedPath)); // ✅ Only return requested subdirectory
+  }
+
+  // Default: Return all project artifacts
   const projects = fs
     .readdirSync(sessionWorkspace, { withFileTypes: true })
     .filter((dir) => dir.isDirectory())
@@ -74,19 +98,21 @@ router.get("/artifacts", (req: Request, res: Response): any => {
 
   for (const projectName of projects) {
     const projectTargetDir = path.join(sessionWorkspace, projectName, "target");
-
     if (!fs.existsSync(projectTargetDir)) {
-      artifacts[projectName] = [];
+      console.log(`⚠️ WARNING: No target directory found for ${projectName}`);
       continue;
     }
 
-    cleanOldBuilds(projectTargetDir); // ✅ Cleanup old builds before fetching artifacts
-
     try {
-      artifacts[projectName] = getArtifactsRecursively(projectTargetDir) || [];
+      artifacts[projectName] = getArtifactsRecursively(projectTargetDir);
+      console.log(
+        `📂 [SESSION: ${sessionId}] Found artifacts in: ${projectTargetDir}`
+      );
     } catch (error) {
-      console.error(`❌ Error reading artifacts for ${projectName}:`, error);
-      artifacts[projectName] = [];
+      console.error(
+        `❌ ERROR: Failed to read artifacts for ${projectName}:`,
+        error
+      );
     }
   }
 

@@ -10,6 +10,7 @@ import { useSelectedProject } from "../hooks/useSelectProject";
 function ProjectList() {
   // const [selectedProject, setSelectedProject] = useState<string>("");
   const [projects, setProjects] = useState<string[]>([]);
+
   const { selectProject, selectedProject } = useSelectedProject();
 
   const { sessionId } = useSessionCache();

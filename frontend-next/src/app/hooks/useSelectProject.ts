@@ -3,11 +3,13 @@ import { toast } from "sonner";
 import { useSessionCache } from "./useSessionCache";
 import { getBackEndUrl } from "../util/getbackEndUrl";
 import { useMenu } from "../store/MenuContext";
+import { useIsMobile } from "./useIsMobile";
 
 export const useSelectedProject = () => {
   const { sessionId } = useSessionCache();
   const backendUrl = getBackEndUrl();
   const { toggleMenu } = useMenu();
+  const isMobile = useIsMobile();
 
   // ✅ Load selected project from localStorage on mount
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
@@ -46,14 +48,14 @@ export const useSelectedProject = () => {
           toast.error("Failed to select project.");
         } else {
           toast.success(`✅ Project switched to ${project}`);
-          toggleMenu();
+          if (isMobile) toggleMenu();
         }
       } catch (error) {
         console.error("❌ Project selection error:", error);
         toast.error("Failed to select project.");
       }
     },
-    [backendUrl, sessionId, toggleMenu]
+    [backendUrl, sessionId, toggleMenu, isMobile]
   );
 
   return { selectedProject, selectProject };

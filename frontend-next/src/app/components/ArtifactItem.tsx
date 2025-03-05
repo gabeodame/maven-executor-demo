@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
-
 interface Artifact {
   name: string;
   isDirectory: boolean;
   path: string;
+  children?: Artifact[]; // ✅ Ensure `children` is part of the Artifact type
 }
 
 interface ArtifactItemProps {
@@ -21,11 +20,11 @@ const ArtifactItem: React.FC<ArtifactItemProps> = ({
   expandedDirs,
   handleDownload,
 }) => {
-  const [expanded, setExpanded] = useState(false);
+  // ✅ Expansion state is derived from `expandedDirs`
+  const isExpanded = expandedDirs.hasOwnProperty(artifact.path);
 
   const handleToggle = async () => {
     await toggleExpand(artifact.path);
-    setExpanded((prev) => !prev);
   };
 
   return (
@@ -39,11 +38,12 @@ const ArtifactItem: React.FC<ArtifactItemProps> = ({
             <span className="truncate w-full break-words">
               <span>📂</span> {artifact.name}
             </span>
-            {expanded ? <span>▼</span> : <span>▶</span>}
+            {isExpanded ? <span>▼</span> : <span>▶</span>}
           </button>
 
-          {/* ✅ Recursively render subdirectory contents */}
-          {expandedDirs[artifact.path] &&
+          {/* ✅ Recursively render `children` or `expandedDirs` */}
+          {isExpanded &&
+            Array.isArray(expandedDirs[artifact.path]) &&
             expandedDirs[artifact.path].length > 0 && (
               <ul className="ml-5 border-l-2 border-gray-600 pl-3 text-wrap">
                 {expandedDirs[artifact.path].map((subArtifact) => (

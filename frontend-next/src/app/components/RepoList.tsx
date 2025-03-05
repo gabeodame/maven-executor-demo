@@ -4,6 +4,7 @@ import { Toaster, toast } from "sonner";
 import Accordion from "./ui/Accordion";
 import { useSessionCache } from "../hooks/useSessionCache";
 import { useMenu } from "../store/MenuContext";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 interface Repository {
   id: number;
@@ -18,6 +19,7 @@ export default function RepoList() {
   const [cloned, setCloned] = useState<boolean>(false);
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
   const { toggleMenu } = useMenu();
+  const isMobile = useIsMobile();
 
   const backendUrl =
     process.env.NODE_ENV === "production"
@@ -98,7 +100,7 @@ export default function RepoList() {
 
       console.log("✅ Repo cloned successfully for session:", sessionId);
       setCloned(true);
-      toggleMenu();
+      if (isMobile) toggleMenu();
       toast.success(`Repository ${selectedRepo.name} cloned successfully`);
     } catch (error) {
       console.error("❌ Clone error:", error);

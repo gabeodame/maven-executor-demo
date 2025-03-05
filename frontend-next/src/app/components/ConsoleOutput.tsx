@@ -43,7 +43,7 @@ const ConsoleOutput = () => {
       ]);
       return;
     }
-    setReceivedLogs(logs); // Force logs to update
+    setReceivedLogs(logs);
   }, [logs, sessionId]);
 
   // Auto-scroll to the latest log
@@ -53,10 +53,9 @@ const ConsoleOutput = () => {
 
   return (
     <div
-      className={`flex w-full flex-col flex-grow overflow-auto bg-gray-800 text-white p-3 font-mono rounded-md border border-gray-700
-        sm:${receivedLogs.length === 0 ? "h-[30vh]" : "h-[50vh]"}
-        md:${receivedLogs.length === 0 ? "h-[50vh]" : "h-[60vh]"}
-        lg:max-h-[calc(100vh-160px)] lg:h-full`}
+      className={`flex flex-col flex-grow overflow-auto bg-gray-800 text-white p-3 font-mono rounded-md border border-gray-700
+        h-[30vh] sm:h-[40vh] md:h-[50vh] 
+        lg:h-[calc(100vh-160px-60px-80px)] xl:h-[calc(100vh-180px-60px-80px)]`}
     >
       {receivedLogs.map((log, index) => (
         <div

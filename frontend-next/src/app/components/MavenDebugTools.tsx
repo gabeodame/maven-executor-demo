@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSocket } from "../hooks/useSocket";
 import Accordion from "./ui/Accordion";
 import { useMenu } from "../store/MenuContext";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 const debugCommands = [
   "help:describe -Dcmd=compile",
@@ -16,9 +17,10 @@ const MavenDebugTools = () => {
   const { loading, runMavenCommand } = useSocket();
   const [selectedCommand, setSelectedCommand] = useState<string | null>(null);
   const { toggleMenu } = useMenu();
+  const isMobile = useIsMobile();
 
   const handleRunCommand = (cmd: string) => {
-    toggleMenu();
+    if (isMobile) toggleMenu();
     setSelectedCommand(cmd);
     runMavenCommand(cmd);
   };
