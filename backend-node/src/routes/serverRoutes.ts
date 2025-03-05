@@ -287,6 +287,17 @@ router.post(
       path.basename(repoUrl, ".git");
     const repoPath = path.join(SESSION_WORKSPACE_DIR, sessionId, safeRepoName);
 
+    // ✅ Check if repo already exists before cloning
+    if (fs.existsSync(repoPath)) {
+      console.log(`⚠️ Repo already exists: ${repoPath}`);
+      return res.json({
+        success: true,
+        message: "Repository already cloned",
+        repoPath,
+        sessionId,
+      });
+    }
+
     console.log(`📂 Cloning repo: ${repoUrl} into ${repoPath}`);
 
     try {
@@ -296,6 +307,8 @@ router.post(
         sessionId,
         safeRepoName
       );
+
+      // ✅ Validate cloning success
       if (!fs.existsSync(clonedPath)) {
         throw new Error(`❌ ERROR: Clone operation failed for ${repoUrl}`);
       }
