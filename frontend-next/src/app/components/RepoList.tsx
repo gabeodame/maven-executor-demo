@@ -41,7 +41,9 @@ export default function RepoList() {
           },
         });
 
-        if (!res.ok) throw new Error(`Failed to fetch repositories`);
+        if (!res.ok) {
+          toast("Failed to fetch project list");
+        }
 
         const data: Repository[] = await res.json();
         setRepos(data);
@@ -132,11 +134,16 @@ export default function RepoList() {
               className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-cyan-500"
             >
               <option value="">-- Select a Repository --</option>
-              {repos.map((repo) => (
-                <option key={repo.id} value={repo.name} className="bg-blue-700">
-                  {repo.name}
-                </option>
-              ))}
+              {Array.isArray(repos) &&
+                repos?.map((repo) => (
+                  <option
+                    key={repo.id}
+                    value={repo.name}
+                    className="bg-blue-700"
+                  >
+                    {repo.name}
+                  </option>
+                ))}
             </select>
 
             <button

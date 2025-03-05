@@ -1,17 +1,15 @@
 "use client";
-// import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import ProjectList from "./ProjectList";
-import RepoList from "./RepoList";
-import Accordion from "./ui/Accordion";
+
+import { AnimatePresence, motion } from "framer-motion";
+
+import { useMenu } from "../store/MenuContext";
 import MavenDebugTools from "./MavenDebugTools";
 import MavenDependencyTools from "./MavenDependencyTools";
 import MavenExecutionTools from "./MavenExecutionTools";
 import MavenPipeline from "./MavenPipeline";
-import { useMenu } from "../store/MenuContext";
+import UserAccount from "./UserAccount";
 
 const MobileMenu = () => {
-  // const [isOpen, setIsOpen] = useState(false);
   const { isOpen, toggleMenu } = useMenu();
 
   return (
@@ -21,7 +19,7 @@ const MobileMenu = () => {
 
       {/* Mobile Menu Button (Top Right) */}
       <button
-        className="md:hidden bg-gray-800 text-white rounded-md fixed top-0 right-4 z-50 shadow-lg "
+        className="h-20 text-3xl md:hidden  text-white rounded-md fixed top-[-3] right-4 z-50 shadow-lg "
         onClick={toggleMenu}
         aria-label="Open Menu"
       >
@@ -60,14 +58,15 @@ const MobileMenu = () => {
             >
               ✖
             </button>
-
+            {/*Login */}
+            <UserAccount />
             {/* Project List Accordion */}
-            <Accordion title="Project List">
+            {/* <Accordion title="Project List">
               <ProjectList />
-            </Accordion>
+            </Accordion> */}
 
             {/* Repo List Accordion */}
-            <RepoList />
+            {/* <RepoList /> */}
             <MavenDependencyTools />
             <MavenDebugTools />
             <MavenExecutionTools />

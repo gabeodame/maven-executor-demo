@@ -135,8 +135,8 @@ export default function RootLayout({
       >
         <SessionProvider>
           <MenuProvider>
-            <header className="w-full h-20 flex justify-between items-center bg-gray-800 shadow-md text-white px-4">
-              <h1 className="text-lg sm:text-2xl font-bold flex items-center gap-2">
+            <header className="w-full  h-20 flex justify-between items-center bg-gray-800 shadow-md text-white px-4">
+              <h1 className="text-2xl sm:text-2xl font-bold flex items-center gap-2">
                 📦 Maven Command Executor
               </h1>
               <MobileMenu />

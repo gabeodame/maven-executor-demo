@@ -42,7 +42,7 @@ function UserAccount() {
 
   return (
     <div className="w-full mb-6">
-      <div className="hidden md:flex">
+      <div className="flex w-full">
         {!sessionId ? (
           <Login />
         ) : (
@@ -55,13 +55,11 @@ function UserAccount() {
         )}
       </div>
       {status === "authenticated" && (
-        <div className="hidden md:flex w-full my-4">
+        <div className="flex w-full my-4">
           <RepoList />
         </div>
       )}
-      <div className="mt-3 md:mt-6">
-        <ProjectList />
-      </div>
+      <div className="mt-3 md:mt-6">{sessionId && <ProjectList />}</div>
     </div>
   );
 }
