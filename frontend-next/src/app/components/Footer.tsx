@@ -1,17 +1,17 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { getBackEndUrl } from "../util/getbackEndUrl";
 
 const Footer = () => {
   const [mavenVersion, setMavenVersion] = useState("Maven: Latest");
 
-  const backendUrl =
-    process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_DEV_URL;
-
   useEffect(() => {
     const fetchMavenVersion = async () => {
+      const backendUrl = getBackEndUrl();
       try {
         const url = `${backendUrl}/api/maven-version`;
+
         const res = await fetch(url);
         const data = await res.json();
         setMavenVersion(data.version || "Maven: Latest");
