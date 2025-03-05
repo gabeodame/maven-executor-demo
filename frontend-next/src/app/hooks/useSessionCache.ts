@@ -1,38 +1,42 @@
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { getBackEndUrl } from "../util/getbackEndUrl";
 
-const SESSION_STORAGE_KEY = "app_session_id";
+const SESSION_STORAGE_KEY = "sessionId";
 
 export const useSessionCache = () => {
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const { data: session, status } = useSession();
+  const [sessionId, setSessionId] = useState<string | null>(
+    typeof window !== "undefined"
+      ? localStorage.getItem(SESSION_STORAGE_KEY)
+      : null
+  );
   const backendUrl = getBackEndUrl();
 
   useEffect(() => {
-    // ✅ Ensure we run only on the client side
-    if (typeof window !== "undefined") {
-      const cachedSession = localStorage.getItem(SESSION_STORAGE_KEY);
-      if (cachedSession) {
-        return;
-      }
-
-      // ✅ Fetch session ID from API if not cached
-      const fetchSession = async () => {
-        try {
-          const url = `${backendUrl}/api/get-session`;
-          const res = await fetch(url);
-          if (!res.ok) throw new Error("Failed to fetch session ID");
-          const data = await res.json();
-
-          setSessionId(data.sessionId);
-          localStorage.setItem(SESSION_STORAGE_KEY, data.sessionId); // ✅ Cache session ID
-        } catch (error) {
-          console.error("❌ Error fetching session ID:", error);
-        }
-      };
-
-      fetchSession();
+    if (status === "authenticated" && session?.user?.id) {
+      console.log("🔄 Updating stored session to:", session.user.id);
+      localStorage.setItem(SESSION_STORAGE_KEY, session.user.id);
+      setSessionId(session.user.id);
     }
-  }, [backendUrl]);
+  }, [session, status]);
 
-  return sessionId;
+  // ✅ Function to explicitly fetch guest session if user selects "Continue as Guest"
+  const fetchGuestSession = async () => {
+    try {
+      const res = await fetch(`${backendUrl}/api/get-session`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to fetch session ID");
+
+      const data = await res.json();
+      console.log("✅ Guest session created:", data.sessionId);
+      localStorage.setItem(SESSION_STORAGE_KEY, data.sessionId);
+      setSessionId(data.sessionId);
+    } catch (error) {
+      console.error("❌ Error fetching session ID:", error);
+    }
+  };
+
+  return { sessionId, fetchGuestSession };
 };

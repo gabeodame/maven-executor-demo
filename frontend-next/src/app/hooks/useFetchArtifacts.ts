@@ -1,7 +1,7 @@
 "use client";
 
 import { useSessionCache } from "../hooks/useSessionCache";
-import { useSession } from "next-auth/react";
+
 import { useEffect, useState, useCallback } from "react";
 import { useSocket } from "./useSocket";
 
@@ -12,9 +12,8 @@ interface Artifact {
 }
 
 export const useArtifacts = () => {
-  const { data: session } = useSession();
-  const cachedSessionId = useSessionCache(); // ✅ Use cached session for guests
-  const sessionId = session?.user?.id || cachedSessionId; // ✅ Use actual session ID if available
+  const { sessionId } = useSessionCache(); // ✅ Use cached session for guests
+
   const { loading: socketStatus } = useSocket();
 
   const [artifacts, setArtifacts] = useState<Record<string, Artifact[]>>({});

@@ -35,7 +35,7 @@ const ConsoleOutput = () => {
   }, [logs]);
 
   return (
-    <div className="bg-gray-800 text-white p-3 w-full max-w-4xl h-full max-h-[620] min-h-[300px] overflow-y-auto font-mono rounded-md border border-gray-700 flex flex-col">
+    <div className="bg-gray-800 text-white p-3 w-full max-w-4xl h-full max-h-[580px] min-h-[300px] overflow-y-auto font-mono rounded-md border border-gray-700 flex flex-col">
       {receivedLogs.map((log, index) => (
         <div
           key={index}

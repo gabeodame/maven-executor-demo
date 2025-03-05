@@ -24,7 +24,7 @@ const MavenPipeline = () => {
   }) => {
     setRunningPipeline(pipeline.name);
     for (const cmd of pipeline.commands) {
-      runMavenCommand(cmd);
+      runMavenCommand(cmd, "pipeline");
       await new Promise((resolve) => setTimeout(resolve, 2000)); // ✅ Avoid overloading
     }
     setRunningPipeline(null);

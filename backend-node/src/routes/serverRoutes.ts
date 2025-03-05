@@ -1,23 +1,22 @@
 import express, { Request, Response } from "express";
 import fs from "fs";
 import path from "path";
+import unzipper from "unzipper";
+import { v4 as uuidv4 } from "uuid";
 import {
-  getJavaProjectPath,
+  DEFAULT_PROJECT_NAME,
   SESSION_WORKSPACE_DIR,
   setJavaProjectPath,
-  DEFAULT_PROJECT_NAME,
 } from "../config/projectPaths";
-import { getBuildMetrics } from "../services/mavenService";
 import { cloneRepository } from "../services/gitService";
-import { v4 as uuidv4 } from "uuid";
-import unzipper from "unzipper";
+import { getBuildMetrics } from "../services/mavenService";
 
-import multer from "multer";
-import { getSessionId } from "../services/sessionService";
 import { execSync } from "child_process";
+import cookieParser from "cookie-parser";
+import multer from "multer";
 
 const router = express.Router();
-
+router.use(cookieParser());
 // ✅ API to Fetch Build Artifacts
 /**
  * ✅ API to Fetch Build Artifacts
@@ -25,8 +24,24 @@ const router = express.Router();
  * @group Artifacts - Operations to fetch build artifacts
  * @returns {object} 200 - An object containing build artifacts
  */
+
+const getArtifactsRecursively = (dirPath: string): any[] => {
+  if (!fs.existsSync(dirPath)) return [];
+
+  return fs.readdirSync(dirPath, { withFileTypes: true }).map((entry) => ({
+    name: entry.name,
+    isDirectory: entry.isDirectory(),
+    path: path.join(dirPath, entry.name),
+    children: entry.isDirectory()
+      ? getArtifactsRecursively(path.join(dirPath, entry.name))
+      : undefined, // Recursive fetch
+  }));
+};
+
 router.get("/artifacts", (req: Request, res: Response): any => {
   const sessionId = req.headers["x-session-id"] as string;
+  const requestedPath = req.query.path as string; // Allow fetching specific subdirectories
+
   console.log(`📂 Fetching artifacts for session: ${sessionId}`);
 
   if (!sessionId) {
@@ -34,12 +49,22 @@ router.get("/artifacts", (req: Request, res: Response): any => {
     return res.status(400).json({ error: "Session ID is required" });
   }
 
-  // ✅ Retrieve the session workspace
   const sessionWorkspace = path.join("/app/workspaces", sessionId);
-
   if (!fs.existsSync(sessionWorkspace)) {
     console.log(`⚠️ WARNING: No workspace found for session ${sessionId}`);
     return res.json({});
+  }
+
+  // If `path` is provided in query, fetch contents of that specific directory
+  if (requestedPath) {
+    if (!fs.existsSync(requestedPath)) {
+      console.log(
+        `⚠️ WARNING: Requested path does not exist: ${requestedPath}`
+      );
+      return res.json([]);
+    }
+    console.log(`📂 Fetching contents of subdirectory: ${requestedPath}`);
+    return res.json(getArtifactsRecursively(requestedPath));
   }
 
   const projects = fs
@@ -49,24 +74,15 @@ router.get("/artifacts", (req: Request, res: Response): any => {
 
   const artifacts: Record<string, any> = {};
 
-  // ✅ Iterate through projects and fetch target artifacts
   for (const projectName of projects) {
     const projectTargetDir = path.join(sessionWorkspace, projectName, "target");
-
     if (!fs.existsSync(projectTargetDir)) {
       console.log(`⚠️ WARNING: No target directory found for ${projectName}`);
       continue;
     }
 
     try {
-      artifacts[projectName] = fs
-        .readdirSync(projectTargetDir, { withFileTypes: true })
-        .map((entry) => ({
-          name: entry.name,
-          isDirectory: entry.isDirectory(),
-          path: path.join(projectTargetDir, entry.name),
-        }));
-
+      artifacts[projectName] = getArtifactsRecursively(projectTargetDir);
       console.log(
         `📂 [SESSION: ${sessionId}] Found artifacts in: ${projectTargetDir}`
       );
@@ -190,46 +206,60 @@ router.post(
  * ✅ API to Retrieve the User's Session ID
  * - Returns existing session ID from `x-session-id` header or cookies
  */
-router.get("/get-session", async (req, res) => {
+
+const AUTH_SESSION_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days for authenticated users
+const GUEST_SESSION_EXPIRY = 30 * 60 * 1000; // 30 minutes for guest users
+
+const sessionCache = new Map<
+  string,
+  { sessionId: string; expiresAt: number }
+>(); // 🔹 In-memory session store
+
+router.post("/get-session", async (req, res): Promise<any> => {
   try {
-    let sessionId = req.headers["x-session-id"] as string;
+    let sessionId =
+      (req.headers["x-session-id"] as string) || req.cookies?.sessionId;
+    let sessionExpiry = GUEST_SESSION_EXPIRY; // Default to guest session expiry
 
-    // ✅ Prioritize session ID from the frontend (NextAuth)
-    if (!sessionId) {
-      const authHeader = req.headers.authorization;
-      if (authHeader?.startsWith("Bearer ")) {
-        const token = authHeader.split(" ")[1];
-
-        // ✅ Validate token and extract session ID (NextAuth user ID)
-        const sessionRes = await fetch(
-          `${process.env.NEXT_PUBLIC_VITE_API_URL}/api/auth/session`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        const sessionData = await sessionRes.json();
-        if (sessionData?.user?.id) {
-          sessionId = sessionData.user.id;
-          console.log(`✅ Authenticated Session Detected: ${sessionId}`);
-        }
+    // ✅ 1. If session exists in cache, validate and return it
+    if (sessionId && sessionCache.has(sessionId)) {
+      const cachedSession = sessionCache.get(sessionId);
+      if (cachedSession && cachedSession.expiresAt > Date.now()) {
+        console.log(`✅ Using Cached Session: ${sessionId}`);
+        return res.json({ sessionId });
+      } else {
+        console.log(`⚠️ Expired session detected, creating a new one.`);
+        sessionCache.delete(sessionId);
       }
     }
 
-    // ✅ Fallback: Use cookie session if available
-    if (!sessionId) {
-      sessionId = req.cookies?.sessionId;
+    // ✅ 2. Determine if this is an authenticated session
+    if (sessionId && !sessionId.startsWith("guest-")) {
+      sessionExpiry = AUTH_SESSION_EXPIRY; // Set longer session expiry for authenticated users
+      console.log(
+        `✅ Authenticated User Session Detected: ${sessionId} (Expiry: 7 days)`
+      );
+    } else {
+      // ✅ 3. If no valid session ID, create a new guest session
+      sessionId = `guest-${uuidv4().slice(0, 10)}`;
+      console.log(
+        `✅ New Guest Session Created: ${sessionId} (Expiry: 30 minutes)`
+      );
     }
 
-    // ✅ If no session ID, generate guest session
-    if (!sessionId) {
-      sessionId = `guest-${uuidv4().slice(0, 10)}`;
-      console.log(`✅ New Guest Session Created: ${sessionId}`);
-      res.cookie("sessionId", sessionId, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-      });
-    }
+    // ✅ 4. Store session in cookies (appropriate expiry based on user type)
+    res.cookie("sessionId", sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: sessionExpiry,
+    });
+
+    // ✅ 5. Store session in cache for quick retrieval
+    sessionCache.set(sessionId, {
+      sessionId,
+      expiresAt: Date.now() + sessionExpiry,
+    });
 
     res.json({ sessionId });
   } catch (error) {
@@ -242,27 +272,39 @@ router.post(
   "/clone-repo",
   async (req: Request, res: Response): Promise<any> => {
     const { repoUrl, branch = "main", projectName } = req.body;
-    const sessionId =
-      (req.headers["x-session-id"] as string) || getSessionId(req, res);
+    const sessionId = req.headers["x-session-id"] as string;
 
-    if (!repoUrl) {
-      return res.status(400).json({ error: "Missing repository URL" });
+    if (!sessionId) {
+      return res.status(400).json({ error: "Session ID is required" });
     }
 
-    const repoName = projectName || path.basename(repoUrl, ".git"); // Allow user to specify or default to repo name
-    const repoPath = `/app/workspaces/${sessionId}/${repoName}`;
+    if (!repoUrl || !repoUrl.startsWith("http")) {
+      return res.status(400).json({ error: "Invalid repository URL" });
+    }
 
-    console.log(
-      `📂 Processing clone for session: ${sessionId} with project: ${repoName}`
-    );
+    const safeRepoName =
+      projectName?.replace(/[^a-zA-Z0-9-_]/g, "") ||
+      path.basename(repoUrl, ".git");
+    const repoPath = path.join(SESSION_WORKSPACE_DIR, sessionId, safeRepoName);
+
+    console.log(`📂 Cloning repo: ${repoUrl} into ${repoPath}`);
 
     try {
-      const clonedPath = cloneRepository(repoUrl, branch, sessionId, repoName);
+      const clonedPath = cloneRepository(
+        repoUrl,
+        branch,
+        sessionId,
+        safeRepoName
+      );
+      if (!fs.existsSync(clonedPath)) {
+        throw new Error(`❌ ERROR: Clone operation failed for ${repoUrl}`);
+      }
+
       setJavaProjectPath(sessionId, clonedPath);
-      res.json({ success: true, repoPath: clonedPath, sessionId });
+      return res.json({ success: true, repoPath: clonedPath, sessionId });
     } catch (error) {
       console.error("❌ ERROR: Failed to clone repository", error);
-      res.status(500).json({ error: "Failed to clone repository" });
+      return res.status(500).json({ error: "Failed to clone repository" });
     }
   }
 );
@@ -271,20 +313,21 @@ router.post("/select-project", (req: Request, res: Response): any => {
   const { projectName } = req.body;
   const sessionId = req.headers["x-session-id"] as string;
 
-  console.log(
-    "🔍 Received project selection request:",
-    `${projectName}-${sessionId}`
-  );
-
   if (!sessionId || !projectName) {
     return res
       .status(400)
       .json({ error: "Missing session ID or project name" });
   }
 
-  const projectPath = `/app/workspaces/${sessionId}/${projectName}`;
+  const safeProjectName = projectName.replace(/[^a-zA-Z0-9-_]/g, ""); // Sanitize input
+  const projectPath = path.join(
+    SESSION_WORKSPACE_DIR,
+    sessionId,
+    safeProjectName
+  );
+
   if (!fs.existsSync(projectPath)) {
-    return res.status(400).json({ error: "Project does not exist" });
+    return res.status(404).json({ error: "Project does not exist" });
   }
 
   setJavaProjectPath(sessionId, projectPath);

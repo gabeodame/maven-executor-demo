@@ -22,8 +22,6 @@ class SocketService {
       auth: { sessionId },
     });
 
-    console.log("🛠️ SocketService initialized with session:", sessionId);
-
     if (!this.listenersAdded) {
       this.socket.on("maven-output", (data: string) => {
         this.logs.push(data);
@@ -47,10 +45,6 @@ class SocketService {
       !SocketService.instance ||
       SocketService.instance.sessionId !== sessionId
     ) {
-      console.log(
-        "🔄 Reinitializing WebSocket with new session ID:",
-        sessionId
-      );
       SocketService.instance = new SocketService(sessionId);
     }
     return SocketService.instance;
@@ -91,7 +85,9 @@ class SocketService {
     return this.loading;
   }
 
-  public runMavenCommand(command: string) {
+  private isFirstPipelineCommand = true; // Track first command in a pipeline
+
+  public runMavenCommand(command: string, type?: string) {
     console.log("🔧 Running Maven Command before sessionId check:", command);
 
     if (!this.sessionId) {
@@ -99,14 +95,18 @@ class SocketService {
       return;
     }
 
-    console.log("🔧 Running Maven Command after sessionId check:", command);
+    // ✅ Handle logs clearing logic
+    if (type === "pipeline") {
+      if (this.isFirstPipelineCommand) {
+        this.clearLogs(); // Clear logs only for the first command in a pipeline
+        this.isFirstPipelineCommand = false; // Mark subsequent commands as non-first
+      }
+    } else {
+      this.clearLogs(); // Always clear logs for non-pipeline commands
+      this.isFirstPipelineCommand = true; // Reset flag when switching to normal commands
+    }
 
-    this.clearLogs();
     this.logs.push(`▶️ [CLIENT] Sending command: mvn ${command}`);
-
-    console.log(
-      ` ▶️ [CLIENT] Sending command: mvn ${command} | Session ID: ${this.sessionId}`
-    );
 
     this.setLoading(true);
     this.socket?.emit("run-maven", command);

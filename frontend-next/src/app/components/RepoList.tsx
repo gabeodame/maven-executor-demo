@@ -1,7 +1,5 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { useSession } from "next-auth/react";
-import GithubIntegration from "./GithubIntegration";
 import { Toaster, toast } from "sonner";
 import Accordion from "./ui/Accordion";
 import { useSessionCache } from "../hooks/useSessionCache";
@@ -13,7 +11,6 @@ interface Repository {
 }
 
 export default function RepoList() {
-  const { data: session } = useSession();
   const [repos, setRepos] = useState<Repository[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [cloning, setCloning] = useState<boolean>(false);
@@ -25,8 +22,7 @@ export default function RepoList() {
       ? process.env.NEXT_PUBLIC_VITE_API_URL!
       : process.env.NEXT_PUBLIC_DEV_URL!;
 
-  const cachedSessionId = useSessionCache(); // ✅ Use cached session for guests
-  const sessionId = session?.user?.id || cachedSessionId; // ✅ Use actual session ID if available
+  const { sessionId } = useSessionCache(); // ✅ Use cached session for guests
 
   console.log("🔒 Session ID:", sessionId);
 
@@ -35,12 +31,14 @@ export default function RepoList() {
     return async () => {
       setLoading(true);
       try {
-        if (!session?.user?.name) {
+        if (!sessionId) {
           console.log("❌ No session ID found");
           return;
         }
         const res = await fetch("/api/github/repos", {
-          headers: { Authorization: `Bearer ${session.accessToken}` },
+          headers: {
+            "x-session-id": sessionId,
+          },
         });
 
         if (!res.ok) throw new Error(`Failed to fetch repositories`);
@@ -54,7 +52,7 @@ export default function RepoList() {
         setLoading(false);
       }
     };
-  }, [session]);
+  }, [sessionId]);
 
   // Fetch data on mount
   useEffect(() => {
@@ -108,18 +106,13 @@ export default function RepoList() {
 
   return (
     <Accordion
-      title="GitHub Integration"
+      title="Repository List"
       bgColor="bg-gray-500"
       hoverColor="hover:bg-gray-600"
+      titleSize=""
     >
       <div className="max-w-lg mx-auto p-4  text-white rounded-lg shadow-md">
-        <div className="w-full mb-4">
-          <GithubIntegration />
-        </div>
-
-        <h2 className="text-lg font-semibold mb-4 text-center">
-          Select a Repository
-        </h2>
+        <h2 className="font-semibold mb-4 text-center">Select a Repository</h2>
 
         {loading ? (
           <div className="flex justify-center items-center">

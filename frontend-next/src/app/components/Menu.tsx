@@ -14,22 +14,19 @@ const MobileMenu = () => {
   // const [isOpen, setIsOpen] = useState(false);
   const { isOpen, toggleMenu } = useMenu();
 
-  console.log("MobileMenu -> isOpen", isOpen);
-
   return (
     <>
       {/* Prevent background scroll when menu is open */}
       {isOpen && <style>{`body { overflow: hidden; }`}</style>}
 
       {/* Mobile Menu Button (Top Right) */}
-      <motion.button
+      <button
         className="md:hidden bg-gray-800 text-white rounded-md fixed top-0 right-4 z-50 shadow-lg "
-        onClick={() => toggleMenu}
+        onClick={toggleMenu}
         aria-label="Open Menu"
-        whileTap={{ scale: 0.9 }}
       >
         ☰
-      </motion.button>
+      </button>
 
       {/* Overlay with blur effect */}
       <AnimatePresence>
@@ -40,7 +37,7 @@ const MobileMenu = () => {
             exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
             transition={{ duration: 0.3 }}
             className="fixed inset-0 bg-black/50 z-40 md:hidden"
-            onClick={() => toggleMenu}
+            onClick={toggleMenu}
           />
         )}
       </AnimatePresence>
@@ -58,7 +55,7 @@ const MobileMenu = () => {
             {/* Close Button */}
             <button
               className="text-white text-xl self-end"
-              onClick={() => toggleMenu}
+              onClick={toggleMenu}
               aria-label="Close Menu"
             >
               ✖
