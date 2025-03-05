@@ -1,25 +1,31 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useSessionCache } from "./useSessionCache";
 import { getBackEndUrl } from "../util/getbackEndUrl";
 import { useMenu } from "../store/MenuContext";
 
 export const useSelectedProject = () => {
-  const { sessionId } = useSessionCache(); // ✅ Get cached session ID
+  const { sessionId } = useSessionCache();
   const backendUrl = getBackEndUrl();
   const { toggleMenu } = useMenu();
 
-  const [selectedProject, setSelectedProject] = useState<string | null>(
-    typeof window !== "undefined"
-      ? localStorage.getItem("selectedProject")
-      : null
-  );
+  // ✅ Load selected project from localStorage on mount
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedProject = localStorage.getItem("selectedProject");
+      if (storedProject) {
+        setSelectedProject(storedProject);
+      }
+    }
+  }, []);
 
   // ✅ Function to select a project and notify the backend
   const selectProject = useCallback(
     async (project: string) => {
       setSelectedProject(project);
-      localStorage.setItem("selectedProject", project); // ✅ Persist selection
+      localStorage.setItem("selectedProject", project);
 
       try {
         if (!sessionId) {

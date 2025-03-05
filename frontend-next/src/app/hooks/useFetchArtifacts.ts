@@ -1,9 +1,8 @@
 "use client";
 
 import { useSessionCache } from "../hooks/useSessionCache";
-
 import { useEffect, useState, useCallback } from "react";
-import { useSocket } from "./useSocket";
+import { useSelectedProject } from "./useSelectProject";
 
 interface Artifact {
   name: string;
@@ -12,12 +11,11 @@ interface Artifact {
 }
 
 export const useArtifacts = () => {
-  const { sessionId } = useSessionCache(); // ✅ Use cached session for guests
-
-  const { loading: socketStatus } = useSocket();
+  const { sessionId } = useSessionCache();
+  const { selectedProject } = useSelectedProject();
 
   const [artifacts, setArtifacts] = useState<Record<string, Artifact[]>>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const isProd = process.env.NODE_ENV === "production";
   const backendUrl = isProd
@@ -25,45 +23,65 @@ export const useArtifacts = () => {
       "https://maven-executor-demo.fly.dev"
     : "http://localhost:5001";
 
-  // 🔄 Fetch artifacts function (callable from outside)
   const fetchArtifacts = useCallback(async () => {
-    if (!sessionId) {
-      console.warn("⚠️ Waiting for session ID before fetching artifacts...");
+    if (!sessionId || !selectedProject) {
+      console.warn("⚠️ Waiting for session ID and selected project...");
       return;
     }
 
     setLoading(true);
-    const url = `${backendUrl}/api/artifacts`;
+    console.log(`Fetching artifacts for project: ${selectedProject}`);
 
     try {
-      const res = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          ...(sessionId && { "x-session-id": sessionId }),
-        },
-      });
+      const res = await fetch(
+        `${backendUrl}/api/artifacts?project=${encodeURIComponent(
+          selectedProject
+        )}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "x-session-id": sessionId,
+          },
+        }
+      );
 
       if (!res.ok) {
         throw new Error(`Server responded with status ${res.status}`);
       }
 
-      const data: Record<string, Artifact[]> = await res.json();
-      console.log("📂 Fetched Artifacts:", data);
-      setArtifacts(data);
+      const data = await res.json();
+
+      // ✅ Ensure correct data structure
+      if (!data || typeof data !== "object") {
+        console.error("❌ API returned unexpected format:", data);
+        setArtifacts((prev) => ({
+          ...prev,
+          [selectedProject]: [], // ✅ Fallback to empty array
+        }));
+        return;
+      }
+
+      console.log("📦 Received Artifacts:", data);
+
+      setArtifacts((prev) => ({
+        ...prev,
+        [selectedProject]: Array.isArray(data[selectedProject])
+          ? data[selectedProject]
+          : [], // ✅ Ensure it's an array
+      }));
     } catch (error) {
       console.error("❌ Error fetching artifacts:", error);
     } finally {
       setLoading(false);
     }
-  }, [sessionId, backendUrl]);
+  }, [sessionId, selectedProject, backendUrl]);
 
-  // 📌 Fetch on sessionId change
   useEffect(() => {
-    if (sessionId || !socketStatus) {
+    if (sessionId && selectedProject) {
       fetchArtifacts();
     }
-  }, [sessionId, fetchArtifacts, socketStatus]);
+  }, [sessionId, selectedProject, fetchArtifacts]);
 
   return { artifacts, loading, fetchArtifacts, setArtifacts };
 };

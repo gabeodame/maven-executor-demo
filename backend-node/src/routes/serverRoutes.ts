@@ -38,34 +38,32 @@ const getArtifactsRecursively = (dirPath: string): any[] => {
   }));
 };
 
+const MAX_BUILDS = 3; // ✅ Keeps only the latest 3 builds
+
+const cleanOldBuilds = (targetPath: string) => {
+  if (!fs.existsSync(targetPath)) return;
+
+  const buildDirs = fs
+    .readdirSync(targetPath, { withFileTypes: true })
+    .filter((dir) => dir.isDirectory() && dir.name.startsWith("build-"))
+    .sort((a, b) => (a.name > b.name ? -1 : 1)); // Sort by name (latest first)
+
+  if (buildDirs.length > MAX_BUILDS) {
+    const oldBuilds = buildDirs.slice(MAX_BUILDS); // Keep only the latest MAX_BUILDS
+    oldBuilds.forEach((oldBuild) => {
+      const buildPath = path.join(targetPath, oldBuild.name);
+      fs.rmSync(buildPath, { recursive: true, force: true });
+      console.log(`🗑️ Deleted old build: ${buildPath}`);
+    });
+  }
+};
+
 router.get("/artifacts", (req: Request, res: Response): any => {
   const sessionId = req.headers["x-session-id"] as string;
-  const requestedPath = req.query.path as string; // Allow fetching specific subdirectories
-
-  console.log(`📂 Fetching artifacts for session: ${sessionId}`);
-
-  if (!sessionId) {
-    console.log("❌ ERROR: No session ID provided!");
-    return res.status(400).json({ error: "Session ID is required" });
-  }
-
   const sessionWorkspace = path.join("/app/workspaces", sessionId);
-  if (!fs.existsSync(sessionWorkspace)) {
-    console.log(`⚠️ WARNING: No workspace found for session ${sessionId}`);
-    return res.json({});
-  }
 
-  // If `path` is provided in query, fetch contents of that specific directory
-  if (requestedPath) {
-    if (!fs.existsSync(requestedPath)) {
-      console.log(
-        `⚠️ WARNING: Requested path does not exist: ${requestedPath}`
-      );
-      return res.json([]);
-    }
-    console.log(`📂 Fetching contents of subdirectory: ${requestedPath}`);
-    return res.json(getArtifactsRecursively(requestedPath));
-  }
+  if (!sessionId) return res.status(400).json({ error: "Session ID required" });
+  if (!fs.existsSync(sessionWorkspace)) return res.json([]);
 
   const projects = fs
     .readdirSync(sessionWorkspace, { withFileTypes: true })
@@ -76,25 +74,63 @@ router.get("/artifacts", (req: Request, res: Response): any => {
 
   for (const projectName of projects) {
     const projectTargetDir = path.join(sessionWorkspace, projectName, "target");
+
     if (!fs.existsSync(projectTargetDir)) {
-      console.log(`⚠️ WARNING: No target directory found for ${projectName}`);
+      artifacts[projectName] = [];
       continue;
     }
 
+    cleanOldBuilds(projectTargetDir); // ✅ Cleanup old builds before fetching artifacts
+
     try {
-      artifacts[projectName] = getArtifactsRecursively(projectTargetDir);
-      console.log(
-        `📂 [SESSION: ${sessionId}] Found artifacts in: ${projectTargetDir}`
-      );
+      artifacts[projectName] = getArtifactsRecursively(projectTargetDir) || [];
     } catch (error) {
-      console.error(
-        `❌ ERROR: Failed to read artifacts for ${projectName}:`,
-        error
-      );
+      console.error(`❌ Error reading artifacts for ${projectName}:`, error);
+      artifacts[projectName] = [];
     }
   }
 
   return res.json(artifacts);
+});
+
+router.post("/reset-artifacts", (req: Request, res: Response): any => {
+  const sessionId = req.headers["x-session-id"] as string;
+  const { project } = req.body;
+
+  if (!sessionId || typeof sessionId !== "string") {
+    console.error("❌ ERROR: Missing or invalid session ID.");
+    return res
+      .status(400)
+      .json({ error: "Session ID is required and must be a string" });
+  }
+
+  if (!project || typeof project !== "string") {
+    console.error("❌ ERROR: Missing or invalid project name.");
+    return res
+      .status(400)
+      .json({ error: "Project name is required and must be a string" });
+  }
+
+  const projectTargetDir = path.join(
+    "/app/workspaces",
+    sessionId,
+    project,
+    "target"
+  );
+
+  if (!fs.existsSync(projectTargetDir)) {
+    console.warn(`⚠️ No target directory found for ${project}`);
+    return res.json({ success: true, message: "No artifacts to delete" });
+  }
+
+  try {
+    fs.rmSync(projectTargetDir, { recursive: true, force: true });
+    console.log(`🗑️ Cleared all artifacts for ${project}`);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error(`❌ ERROR: Failed to clear artifacts for ${project}:`, error);
+    return res.status(500).json({ error: "Failed to clear artifacts" });
+  }
 });
 
 // ✅ API to Download Files
