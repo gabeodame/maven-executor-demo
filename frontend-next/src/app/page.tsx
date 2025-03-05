@@ -2,7 +2,7 @@ import BuildMetrics from "./components/BuildMetrics";
 import ConsoleOutput from "./components/ConsoleOutput";
 import Executor from "./components/Executor";
 
-import RepoList from "./components/RepoList";
+// import RepoList from "./components/RepoList";
 import Artifacts from "./components/Artifacts";
 import SideBarLeft from "./components/SideBarLeft";
 
@@ -37,13 +37,13 @@ export default function Home() {
           </div>
 
           {/* ✅ Right Sidebar (Expands & Scrolls with Main Section) */}
-          <aside className="bg-gray-700 px-2 shadow-md w-full md:w-full md:mt-6 lg:mt-0 lg:w-full flex flex-col gap-4">
+          <aside className="bg-gray-700 px-2 shadow-md w-full md:w-full md:mt-6 mb-2 lg:mt-0 lg:w-full flex flex-col gap-4">
             {/* 📌 Scrollable Inner Content */}
             <div className="overflow-y-auto p-2 flex-1 flex flex-col gap-4 w-full">
               {/* Repo List (Hidden on mobile, shown on lg+) */}
-              <div className="hidden lg:flex w-full mb-2">
+              {/* <div className="hidden lg:flex w-full mb-2">
                 <RepoList />
-              </div>
+              </div> */}
 
               {/* 📌 Metrics & Artifacts (Flows with Main Content) */}
               <div className="flex flex-col md:flex-row gap-4 lg:flex-col md:gap-4 w-full">

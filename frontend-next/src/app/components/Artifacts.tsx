@@ -86,7 +86,7 @@ export default function Artifacts() {
     }
   };
 
-  if (loading) {
+  if (!loading) {
     return <p className="text-center text-gray-400">Loading artifacts...</p>;
   }
 

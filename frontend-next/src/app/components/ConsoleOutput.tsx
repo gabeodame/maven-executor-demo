@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSocket } from "../hooks/useSocket";
 import { useSessionCache } from "../hooks/useSessionCache";
 
@@ -31,8 +31,8 @@ const getLogColor = (log: string) => {
 const ConsoleOutput = () => {
   const [receivedLogs, setReceivedLogs] = useState<string[]>([]);
   const { sessionId } = useSessionCache();
-
   const { logs } = useSocket();
+  const logsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!sessionId) {
@@ -46,8 +46,18 @@ const ConsoleOutput = () => {
     setReceivedLogs(logs); // Force logs to update
   }, [logs, sessionId]);
 
+  // Auto-scroll to the latest log
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [receivedLogs]);
+
   return (
-    <div className="flex w-full h-full flex-col flex-grow max-h-[75vh] min-h-[540px] overflow-auto bg-gray-800 text-white p-3  font-mono rounded-md border border-gray-700">
+    <div
+      className={`flex w-full flex-col flex-grow overflow-auto bg-gray-800 text-white p-3 font-mono rounded-md border border-gray-700
+        sm:${receivedLogs.length === 0 ? "h-[30vh]" : "h-[50vh]"}
+        md:${receivedLogs.length === 0 ? "h-[50vh]" : "h-[60vh]"}
+        lg:max-h-[calc(100vh-160px)] lg:h-full`}
+    >
       {receivedLogs.map((log, index) => (
         <div
           key={index}
@@ -58,6 +68,7 @@ const ConsoleOutput = () => {
           {log}
         </div>
       ))}
+      <div ref={logsEndRef} /> {/* Invisible div to auto-scroll */}
     </div>
   );
 };

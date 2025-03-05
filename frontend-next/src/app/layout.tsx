@@ -142,7 +142,7 @@ export default function RootLayout({
               <MobileMenu />
             </header>
 
-            <main className="w-full h-full flex-grow bg-gray-900">
+            <main className="w-full h-full flex-grow bg-gray-900 mt-20">
               {children}
             </main>
             <Footer />
