@@ -131,17 +131,19 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col w-full`}
       >
         <SessionProvider>
           <MenuProvider>
-            <header className="w-full h-16 flex justify-between items-center bg-gray-800 shadow-md text-white px-4">
+            <header className="w-full h-20 flex justify-between items-center bg-gray-800 shadow-md text-white px-4">
               <h1 className="text-lg sm:text-2xl font-bold flex items-center gap-2">
                 📦 Maven Command Executor
               </h1>
               <MobileMenu />
             </header>
-            <main className="flex-grow bg-gray-900">{children}</main>
+            <main className="w-full h-full flex-grow bg-gray-900">
+              {children}
+            </main>
             <Footer />
           </MenuProvider>
         </SessionProvider>

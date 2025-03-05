@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useSocket } from "../hooks/useSocket";
 
@@ -35,7 +36,7 @@ const ConsoleOutput = () => {
   }, [logs]);
 
   return (
-    <div className="flex flex-col flex-grow max-h-[70vh] min-h-[300px] overflow-auto bg-gray-800 text-white p-3 w-full font-mono rounded-md border border-gray-700">
+    <div className="flex w-full h-full flex-col flex-grow max-h-[75vh] min-h-[540px] overflow-auto bg-gray-800 text-white p-3  font-mono rounded-md border border-gray-700">
       {receivedLogs.map((log, index) => (
         <div
           key={index}

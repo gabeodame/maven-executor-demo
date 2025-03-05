@@ -41,7 +41,7 @@ function UserAccount() {
   console.log(status);
 
   return (
-    <div className="mb-6">
+    <div className="w-full mb-6">
       <div className="hidden md:flex">
         {!sessionId ? (
           <Login />
