@@ -46,7 +46,7 @@ export default function Home() {
               </div>
 
               {/* 📌 Metrics & Artifacts (Flows with Main Content) */}
-              <div className="flex flex-col md:flex-row lg:flex-col md:gap-4 w-full">
+              <div className="flex flex-col md:flex-row gap-4 lg:flex-col md:gap-4 w-full">
                 <BuildMetrics />
                 <Artifacts />
               </div>

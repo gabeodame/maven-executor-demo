@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSocket } from "../hooks/useSocket";
 import Accordion from "./ui/Accordion";
+import { useMenu } from "../store/MenuContext";
 
 const dependencyCommands = [
   "dependency:tree",
@@ -15,8 +16,10 @@ const dependencyCommands = [
 const MavenDependencyTools = () => {
   const { loading, runMavenCommand } = useSocket();
   const [selectedCommand, setSelectedCommand] = useState<string | null>(null);
+  const { toggleMenu } = useMenu();
 
   const handleRunCommand = (cmd: string) => {
+    toggleMenu();
     setSelectedCommand(cmd);
     runMavenCommand(cmd);
   };

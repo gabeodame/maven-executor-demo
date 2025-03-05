@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSocket } from "../hooks/useSocket";
 import Accordion from "./ui/Accordion";
+import { useMenu } from "../store/MenuContext";
 
 const debugCommands = [
   "help:describe -Dcmd=compile",
@@ -14,8 +15,10 @@ const debugCommands = [
 const MavenDebugTools = () => {
   const { loading, runMavenCommand } = useSocket();
   const [selectedCommand, setSelectedCommand] = useState<string | null>(null);
+  const { toggleMenu } = useMenu();
 
   const handleRunCommand = (cmd: string) => {
+    toggleMenu();
     setSelectedCommand(cmd);
     runMavenCommand(cmd);
   };

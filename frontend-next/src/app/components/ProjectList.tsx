@@ -6,14 +6,11 @@ import { useSessionCache } from "../hooks/useSessionCache";
 import Accordion from "./ui/Accordion";
 import ProjectItem from "./ProjectItem";
 import { useSelectedProject } from "../hooks/useSelectProject";
-// import { useArtifacts } from "../hooks/useFetchArtifacts";
 
 function ProjectList() {
   // const [selectedProject, setSelectedProject] = useState<string>("");
   const [projects, setProjects] = useState<string[]>([]);
   const { selectProject, selectedProject } = useSelectedProject();
-
-  // const { fetchArtifacts } = useArtifacts();
 
   const { sessionId } = useSessionCache();
 

@@ -2,10 +2,12 @@ import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { useSessionCache } from "./useSessionCache";
 import { getBackEndUrl } from "../util/getbackEndUrl";
+import { useMenu } from "../store/MenuContext";
 
 export const useSelectedProject = () => {
   const { sessionId } = useSessionCache(); // ✅ Get cached session ID
   const backendUrl = getBackEndUrl();
+  const { toggleMenu } = useMenu();
 
   const [selectedProject, setSelectedProject] = useState<string | null>(
     typeof window !== "undefined"
@@ -38,13 +40,14 @@ export const useSelectedProject = () => {
           toast.error("Failed to select project.");
         } else {
           toast.success(`✅ Project switched to ${project}`);
+          toggleMenu();
         }
       } catch (error) {
         console.error("❌ Project selection error:", error);
         toast.error("Failed to select project.");
       }
     },
-    [backendUrl, sessionId]
+    [backendUrl, sessionId, toggleMenu]
   );
 
   return { selectedProject, selectProject };

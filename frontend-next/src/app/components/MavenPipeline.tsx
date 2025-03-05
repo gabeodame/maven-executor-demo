@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSocket } from "../hooks/useSocket";
 import Accordion from "./ui/Accordion";
+import { useMenu } from "../store/MenuContext";
 
 const pipelines = [
   { name: "Full Build", commands: ["clean", "compile", "package", "install"] },
@@ -17,11 +18,13 @@ const pipelines = [
 const MavenPipeline = () => {
   const { loading, runMavenCommand } = useSocket();
   const [runningPipeline, setRunningPipeline] = useState<string | null>(null);
+  const { toggleMenu } = useMenu();
 
   const handleRunPipeline = async (pipeline: {
     name: string;
     commands: string[];
   }) => {
+    toggleMenu();
     setRunningPipeline(pipeline.name);
     for (const cmd of pipeline.commands) {
       runMavenCommand(cmd, "pipeline");

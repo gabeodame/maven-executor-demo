@@ -6,12 +6,14 @@ import RepoList from "./RepoList";
 import { useSession, signOut } from "next-auth/react";
 import ProjectList from "./ProjectList";
 import { useSessionCache } from "../hooks/useSessionCache";
+import { useMenu } from "../store/MenuContext";
 
 function UserAccount() {
   const { data: session, status } = useSession();
   const { sessionId: cachedSessionId } = useSessionCache();
   const [isGithubUser, setIsGithubUser] = useState(false);
   const [isClient, setIsClient] = useState(false); // ✅ Prevent SSR mismatch
+  const { toggleMenu } = useMenu();
 
   const sessionId = session?.user?.id || cachedSessionId;
   useEffect(() => {
@@ -48,7 +50,10 @@ function UserAccount() {
         ) : (
           <button
             className="w-full px-4 py-2 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700 ease-in transition-all cursor-pointer"
-            onClick={handleSignOut}
+            onClick={() => {
+              toggleMenu();
+              handleSignOut();
+            }}
           >
             SignOut
           </button>
