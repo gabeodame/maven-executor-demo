@@ -37,7 +37,7 @@ export default function Home() {
               <h3 className="text-lg font-semibold text-center mb-2">
                 Console Output
               </h3>
-              <div className="flex-1 overflow-hidden bg-gray-900 p-3  rounded-md">
+              <div className="flex flex-col flex-grow w-full p-4">
                 <ConsoleOutput />
               </div>
             </section>
