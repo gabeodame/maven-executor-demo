@@ -25,7 +25,7 @@ const Footer = () => {
 
   return (
     <footer className="w-full h-12 bg-gray-800 text-gray-300 text-sm flex justify-between items-center px-6">
-      <span>🔧 Built for Java 17+ | {mavenVersion}</span>
+      <span>🔧 Built for Java 17+ | {mavenVersion}</span>{" "}
       <span>
         🚀 Version: 1.0.0 | GitHub:{" "}
         <Link
