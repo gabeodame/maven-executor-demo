@@ -357,12 +357,11 @@ router.post(
       return res.json({
         success: true,
         message: "Repository already cloned",
-        repoPath,
         sessionId,
       });
     }
 
-    console.log(`📂 Cloning repo: ${repoUrl} into ${repoPath}`);
+    console.log(`📂 Cloning repo: ${repoUrl} on branch ${branch}`);
 
     try {
       const clonedPath = cloneRepository(
@@ -374,18 +373,20 @@ router.post(
 
       // ✅ Validate cloning success
       if (!fs.existsSync(clonedPath)) {
-        throw new Error(`❌ ERROR: Clone operation failed for ${repoUrl}`);
+        throw new Error("Clone operation failed.");
       }
 
-      setJavaProjectPath(sessionId, clonedPath);
-      return res.json({ success: true, repoPath: clonedPath, sessionId });
+      return res.json({ success: true, sessionId });
     } catch (error) {
       console.error("❌ ERROR: Failed to clone repository", error);
-      return res.status(500).json({ error: "Failed to clone repository" });
+
+      return res.status(400).json({
+        error:
+          error instanceof Error ? error.message : "An unknown error occurred.",
+      });
     }
   }
 );
-
 router.post("/select-project", (req: Request, res: Response): any => {
   const { projectName } = req.body;
   const sessionId = req.headers["x-session-id"] as string;
@@ -469,6 +470,47 @@ router.get("/user-projects", (req: Request, res: Response): any => {
     return res.status(500).json({ error: "Failed to retrieve projects" });
   }
 });
+
+router.delete(
+  "/delete-project",
+  async (req: Request, res: Response): Promise<any> => {
+    const { projectName } = req.body;
+    const sessionId = req.headers["x-session-id"] as string;
+
+    if (!sessionId) {
+      return res.status(400).json({ error: "Session ID is required" });
+    }
+    if (!projectName || projectName === "demo-java-app") {
+      return res.status(400).json({ error: "Project name is required" });
+    }
+
+    const projectPath = path.join(
+      SESSION_WORKSPACE_DIR,
+      sessionId,
+      projectName
+    );
+
+    // ✅ Ensure project exists before deleting
+    if (!fs.existsSync(projectPath)) {
+      console.log(`⚠️ Project ${projectName} does not exist.`);
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    try {
+      // ✅ Recursively delete project folder
+      fs.rmSync(projectPath, { recursive: true, force: true });
+      console.log(`🗑️ Project ${projectName} deleted successfully.`);
+
+      return res.json({
+        success: true,
+        message: `Project ${projectName} deleted`,
+      });
+    } catch (error) {
+      console.error(`❌ Error deleting project ${projectName}:`, error);
+      return res.status(500).json({ error: "Failed to delete project" });
+    }
+  }
+);
 
 // API route to get Maven version
 router.get("/maven-version", async (req, res) => {

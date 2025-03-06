@@ -1,22 +1,26 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Accordion from "./ui/Accordion";
 import ProjectItem from "./ProjectItem";
 import { useSessionCache } from "../store/SessionProvider";
 import { getBackEndUrl } from "../util/getbackEndUrl";
 import { useSelectedProject } from "../hooks/useSelectedProject";
+import { toast } from "sonner";
 
 const PROJECT_STORAGE_KEY = "selectedProject";
 
 function ProjectList() {
   const [projects, setProjects] = useState<string[]>([]);
-  const { selectProject, selectedProject } = useSelectedProject();
+  const { selectProject, selectedProject, hasUserSelected } =
+    useSelectedProject();
   const { sessionId } = useSessionCache();
+
+  const hasFetched = useRef(false); // ✅ Prevent multiple fetches
 
   // ✅ Fetch Projects
   const fetchProjects = useCallback(async () => {
-    if (!sessionId) return;
+    if (!sessionId || hasFetched.current) return; // ✅ Prevent duplicate fetch
 
     console.log("📂 Fetching Projects...");
     try {
@@ -31,24 +35,72 @@ function ProjectList() {
       console.log("📂 Fetched Projects:", projectList);
       setProjects(projectList);
 
-      // ✅ Ensure global state stays in sync
-      const cachedProject = localStorage.getItem(PROJECT_STORAGE_KEY);
-      if (cachedProject && projectList.includes(cachedProject)) {
-        if (cachedProject !== selectedProject) {
-          selectProject(cachedProject); // ✅ Set global state
+      hasFetched.current = true; // ✅ Mark as fetched
+
+      // ✅ Restore Cached Project or Default to First **ONLY IF USER HASN’T SELECTED ONE**
+      if (!hasUserSelected.current) {
+        const cachedProject = localStorage.getItem(PROJECT_STORAGE_KEY);
+        if (cachedProject && projectList.includes(cachedProject)) {
+          selectProject(cachedProject);
+        } else if (projectList.length > 0) {
+          selectProject(projectList[0]);
         }
-      } else if (projectList.length > 0 && selectedProject !== projectList[0]) {
-        selectProject(projectList[0]); // ✅ Default to first project
       }
     } catch (error) {
       console.error("❌ Error fetching projects:", error);
     }
-  }, [sessionId, selectedProject, selectProject]);
+  }, [sessionId, selectProject, hasUserSelected]);
 
-  // ✅ Fetch projects on sessionId change or first mount
+  // ✅ Fetch Projects on Initial Mount
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  // ✅ Handle Project Deletion
+  const handleDeleteProject = async (projectName: string) => {
+    if (!sessionId) {
+      toast.error("Session ID missing. Please refresh and try again.");
+      return;
+    }
+
+    if (projectName === "demo-java-app") {
+      alert("You cannot delete default demo app");
+      return;
+    }
+
+    const backendUrl = getBackEndUrl();
+
+    try {
+      const response = await fetch(`${backendUrl}/api/delete-project`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": sessionId,
+        },
+        body: JSON.stringify({ projectName }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete project");
+      }
+
+      toast.success(`🗑️ Project ${projectName} deleted successfully`);
+
+      // ✅ Remove from project list
+      const updatedProjects = projects.filter((p) => p !== projectName);
+      setProjects(updatedProjects);
+
+      // ✅ Set new default project
+      if (selectedProject === projectName) {
+        const newDefault =
+          updatedProjects.length > 0 ? updatedProjects[0] : null;
+        selectProject(newDefault as string);
+      }
+    } catch (error) {
+      console.error("❌ Error deleting project:", error);
+      toast.error("Failed to delete project.");
+    }
+  };
 
   return (
     <Accordion
@@ -58,13 +110,17 @@ function ProjectList() {
     >
       {projects.length > 0 ? (
         <div className="space-y-2">
-          {projects.map((project, idx) => (
+          {projects.map((project, index) => (
             <ProjectItem
               key={project}
               project={project}
-              handleSelectProject={() => selectProject(project)}
+              index={index}
+              handleSelectProject={() => {
+                hasUserSelected.current = true; // ✅ User manually selected a project
+                selectProject(project);
+              }}
+              handleDeleteProject={() => handleDeleteProject(project)} // ✅ Pass delete handler
               selectedProject={selectedProject}
-              index={idx}
             />
           ))}
         </div>

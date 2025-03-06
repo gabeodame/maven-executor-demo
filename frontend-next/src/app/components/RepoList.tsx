@@ -6,6 +6,7 @@ import Accordion from "./ui/Accordion";
 import { useMenu } from "../store/MenuContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useSessionCache } from "../store/SessionProvider";
+import { useSelectedProject } from "../hooks/useSelectedProject";
 
 interface Repository {
   id: number;
@@ -19,19 +20,20 @@ export default function RepoList() {
   const [cloning, setCloning] = useState<boolean>(false);
   const [cloned, setCloned] = useState<boolean>(false);
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
+
   const { toggleMenu } = useMenu();
   const isMobile = useIsMobile();
+  const { sessionId } = useSessionCache();
+  const { selectProject } = useSelectedProject(); // ✅ Set global state when cloning
 
   const backendUrl =
     process.env.NODE_ENV === "production"
       ? process.env.NEXT_PUBLIC_VITE_API_URL!
       : process.env.NEXT_PUBLIC_DEV_URL!;
 
-  const { sessionId } = useSessionCache(); // ✅ Use cached session for guests
-
   console.log("🔒 Session ID:", sessionId);
 
-  // Fetch GitHub repositories
+  // ✅ Fetch GitHub repositories
   const fetchRepos = useMemo(() => {
     return async () => {
       setLoading(true);
@@ -47,7 +49,8 @@ export default function RepoList() {
         });
 
         if (!res.ok) {
-          toast("Failed to fetch project list");
+          toast.error("Failed to fetch repositories");
+          return;
         }
 
         const data: Repository[] = await res.json();
@@ -61,12 +64,12 @@ export default function RepoList() {
     };
   }, [sessionId]);
 
-  // Fetch data on mount
+  // ✅ Fetch data on mount
   useEffect(() => {
     fetchRepos();
   }, [fetchRepos]);
 
-  // Handle repository cloning
+  // ✅ Handle repository cloning
   const handleClone = async () => {
     if (!selectedRepo) {
       toast.error("Select a repository to clone");
@@ -95,17 +98,27 @@ export default function RepoList() {
         }),
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        throw new Error("Failed to clone repository");
+        toast.error(responseData.error || "Failed to clone repository");
+        throw new Error(responseData.error);
       }
 
       console.log("✅ Repo cloned successfully for session:", sessionId);
+      toast.success(`Repository ${selectedRepo.name} cloned successfully`);
+
+      // ✅ Update global state only if the clone was successful
+      selectProject(selectedRepo.name);
+
       setCloned(true);
       if (isMobile) toggleMenu();
-      toast.success(`Repository ${selectedRepo.name} cloned successfully`);
     } catch (error) {
-      console.error("❌ Clone error:", error);
-      toast.error("Failed to clone repository");
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("Failed to clone your repo");
+      }
       setCloned(false);
     } finally {
       setCloning(false);
@@ -117,9 +130,8 @@ export default function RepoList() {
       title="Repository List"
       bgColor="bg-gray-500"
       hoverColor="hover:bg-gray-600"
-      titleSize=""
     >
-      <div className="max-w-lg mx-auto p-4  text-white rounded-lg shadow-md">
+      <div className="max-w-lg mx-auto p-4 text-white rounded-lg shadow-md">
         <h2 className="font-semibold mb-4 text-center">Select a Repository</h2>
 
         {loading ? (

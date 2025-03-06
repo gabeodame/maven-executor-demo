@@ -1,9 +1,11 @@
 "use client";
+import { FiTrash2 } from "react-icons/fi";
 
 interface ProjectItemProps {
   project: string;
   selectedProject: string | null;
   handleSelectProject: (projectName: string) => void;
+  handleDeleteProject: () => void; // ✅ New delete handler
   index: number;
 }
 
@@ -11,32 +13,33 @@ function ProjectItem({
   project,
   selectedProject,
   handleSelectProject,
+  handleDeleteProject,
 }: ProjectItemProps) {
-  const isSelected = selectedProject === project;
-
   return (
-    <button
-      onClick={() => handleSelectProject(project)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          handleSelectProject(project);
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      className={`w-full flex items-center justify-between px-4 py-2 rounded-md text-sm font-medium transition-all
-        ${
-          isSelected
-            ? "bg-cyan-900 text-white font-bold shadow-lg"
-            : "hover:bg-cyan-700 hover:text-white"
-        }
-      `}
-      aria-pressed={isSelected} // ✅ Accessibility improvement
+    <div
+      key={project}
+      className={`w-full flex justify-between items-center text-sm cursor-pointer p-3 rounded-lg border border-gray-600 transition ${
+        selectedProject === project
+          ? "bg-cyan-900 text-white font-bold shadow-md" // Active project styling
+          : "hover:bg-cyan-700 hover:text-white"
+      }`}
     >
-      <span className="truncate">{project}</span>
-      {isSelected && <span className="text-sm">✔</span>}{" "}
-      {/* ✅ Active project indicator */}
-    </button>
+      <span onClick={() => handleSelectProject(project)} role="button">
+        {project}
+      </span>
+
+      {/* 🗑️ Delete Button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation(); // Prevent triggering project selection
+          handleDeleteProject();
+        }}
+        className="text-red-300 hover:text-red-700 hover:scale-105 ease-in transition"
+        aria-label={`Delete ${project}`}
+      >
+        {project !== "demo-java-app" && <FiTrash2 />}
+      </button>
+    </div>
   );
 }
 

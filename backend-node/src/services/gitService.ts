@@ -28,15 +28,17 @@ export const cloneRepository = (
   }
 
   try {
-    console.log(`🚀 Cloning repository: ${repoUrl} into ${repoPath}`);
+    console.log(`🚀 Cloning repository: ${repoUrl} into workspace`);
     execSync(`git clone --branch ${branch} --depth=1 ${repoUrl} ${repoPath}`, {
       stdio: "inherit",
     });
 
     // ✅ Ensure `pom.xml` exists before proceeding
-    if (!fs.existsSync(path.join(repoPath, "pom.xml"))) {
-      console.error(`❌ ERROR: No pom.xml found in ${repoPath}`);
-      throw new Error(`No pom.xml found in ${repoPath}`);
+    const pomPath = path.join(repoPath, "pom.xml");
+    if (!fs.existsSync(pomPath)) {
+      console.error(`❌ ERROR: No pom.xml found. Deleting repo.`);
+      fs.rmSync(repoPath, { recursive: true, force: true }); // ✅ Clean up failed repo
+      throw new Error("Invalid project: A valid pom.xml file is required.");
     }
 
     // ✅ Set Java project path for this session
@@ -46,6 +48,30 @@ export const cloneRepository = (
     return repoPath;
   } catch (error) {
     console.error("❌ ERROR: Git Clone Failed", error);
-    throw new Error("Git clone operation failed.");
+
+    // ✅ Ensure failed repo directory is deleted
+    if (fs.existsSync(repoPath)) {
+      console.log(`🗑 Cleaning up failed clone: ${repoPath}`);
+      fs.rmSync(repoPath, { recursive: true, force: true });
+    }
+
+    let errorMessage =
+      "An unexpected error occurred during repository cloning.";
+
+    if (error instanceof Error) {
+      if (error.message.includes("No pom.xml")) {
+        errorMessage = "Invalid project: A valid pom.xml file is required.";
+      } else if (error.message.includes("Git clone operation failed")) {
+        errorMessage =
+          "Git clone operation failed. Please check the repository URL and branch.";
+      } else {
+        errorMessage = error.message; // Preserve other possible errors
+      }
+    }
+
+    throw new Error(errorMessage);
   }
 };
+
+//TODO: Ensure user can setup webhook to detect git updates.
+//TODO: make sure user can update existing repo. may be why reclone? that case replace existing
