@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useSocket } from "../hooks/useSocket";
-import { useSessionCache } from "../hooks/useSessionCache";
+import { useSessionCache } from "../store/SessionProvider";
 
 const getLogColor = (log: string) => {
   if (

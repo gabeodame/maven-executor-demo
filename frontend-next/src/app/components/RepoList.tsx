@@ -2,9 +2,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { Toaster, toast } from "sonner";
 import Accordion from "./ui/Accordion";
-import { useSessionCache } from "../hooks/useSessionCache";
+
 import { useMenu } from "../store/MenuContext";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { useSessionCache } from "../store/SessionProvider";
 
 interface Repository {
   id: number;

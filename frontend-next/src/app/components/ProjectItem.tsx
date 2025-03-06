@@ -12,9 +12,10 @@ function ProjectItem({
   selectedProject,
   handleSelectProject,
 }: ProjectItemProps) {
+  const isSelected = selectedProject === project;
+
   return (
-    <div
-      key={project}
+    <button
       onClick={() => handleSelectProject(project)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -23,14 +24,19 @@ function ProjectItem({
       }}
       role="button"
       tabIndex={0}
-      className={`w-full text-sm cursor-pointer p-3 rounded-lg border border-gray-600 transition ${
-        selectedProject === project
-          ? "bg-cyan-900 text-white font-bold shadow-md" // Active project styling
-          : "hover:bg-cyan-700 hover:text-white"
-      }`}
+      className={`w-full flex items-center justify-between px-4 py-2 rounded-md text-sm font-medium transition-all
+        ${
+          isSelected
+            ? "bg-cyan-900 text-white font-bold shadow-lg"
+            : "hover:bg-cyan-700 hover:text-white"
+        }
+      `}
+      aria-pressed={isSelected} // ✅ Accessibility improvement
     >
-      {project}
-    </div>
+      <span className="truncate">{project}</span>
+      {isSelected && <span className="text-sm">✔</span>}{" "}
+      {/* ✅ Active project indicator */}
+    </button>
   );
 }
 

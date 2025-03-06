@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import SocketService from "../services/SocketService";
-import { useSessionCache } from "../hooks/useSessionCache";
+
 import { useSession } from "next-auth/react";
+import { useSessionCache } from "../store/SessionProvider";
 
 export const useSocket = () => {
   const { sessionId: cachedSessionId } = useSessionCache() || { sessionId: "" };

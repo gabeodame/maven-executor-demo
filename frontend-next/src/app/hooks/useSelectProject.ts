@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { useSessionCache } from "./useSessionCache";
+
 import { getBackEndUrl } from "../util/getbackEndUrl";
 import { useMenu } from "../store/MenuContext";
 import { useIsMobile } from "./useIsMobile";
+import { useSessionCache } from "../store/SessionProvider";
 
 export const useSelectedProject = () => {
   const { sessionId } = useSessionCache();
@@ -26,6 +27,8 @@ export const useSelectedProject = () => {
   // ✅ Function to select a project and notify the backend
   const selectProject = useCallback(
     async (project: string) => {
+      if (!project || project === selectedProject) return;
+
       setSelectedProject(project);
       localStorage.setItem("selectedProject", project);
 
@@ -48,14 +51,18 @@ export const useSelectedProject = () => {
           toast.error("Failed to select project.");
         } else {
           toast.success(`✅ Project switched to ${project}`);
-          if (isMobile) toggleMenu();
+
+          // ✅ Prevent menu from opening on desktop
+          if (isMobile) {
+            toggleMenu();
+          }
         }
       } catch (error) {
         console.error("❌ Project selection error:", error);
         toast.error("Failed to select project.");
       }
     },
-    [backendUrl, sessionId, toggleMenu, isMobile]
+    [backendUrl, sessionId, selectedProject, isMobile, toggleMenu]
   );
 
   return { selectedProject, selectProject };

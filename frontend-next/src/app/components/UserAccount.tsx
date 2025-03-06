@@ -5,8 +5,9 @@ import Login from "./Login";
 import RepoList from "./RepoList";
 import { useSession, signOut } from "next-auth/react";
 import ProjectList from "./ProjectList";
-import { useSessionCache } from "../hooks/useSessionCache";
+
 import { useMenu } from "../store/MenuContext";
+import { useSessionCache } from "../store/SessionProvider";
 
 function UserAccount() {
   const { data: session, status } = useSession();
@@ -43,7 +44,7 @@ function UserAccount() {
   console.log(status);
 
   return (
-    <div className="w-full mb-6">
+    <div className="w-full flex flex-col gap-2 mb-6">
       <div className="flex w-full">
         {!sessionId ? (
           <Login />
@@ -59,12 +60,21 @@ function UserAccount() {
           </button>
         )}
       </div>
-      {status === "authenticated" && (
-        <div className="flex w-full my-4">
-          <RepoList />
-        </div>
-      )}
-      <div className="mt-3 md:mt-6">{sessionId && <ProjectList />}</div>
+      <div className="w-full">
+        {status === "authenticated" && (
+          <div className="flex flex-col gap-1 w-full my-4">
+            <div>
+              <p>
+                🎉 Welcome, <strong>{session.user?.name}</strong>! You&apos;re
+                connected to GitHub.
+              </p>
+            </div>
+            <RepoList />
+          </div>
+        )}
+
+        <div className="mt-3 md:mt-6">{sessionId && <ProjectList />}</div>
+      </div>
     </div>
   );
 }

@@ -72,7 +72,7 @@ router.get("/artifacts", (req: Request, res: Response): any => {
   const sessionWorkspace = path.join("/app/workspaces", sessionId);
   if (!fs.existsSync(sessionWorkspace)) {
     console.log(`⚠️ WARNING: No workspace found for session ${sessionId}`);
-    return res.json([]);
+    return res.json({});
   }
 
   // If a specific path is requested, return its contents directly
@@ -100,6 +100,7 @@ router.get("/artifacts", (req: Request, res: Response): any => {
     const projectTargetDir = path.join(sessionWorkspace, projectName, "target");
     if (!fs.existsSync(projectTargetDir)) {
       console.log(`⚠️ WARNING: No target directory found for ${projectName}`);
+      artifacts[projectName] = []; // ✅ Return an empty array if no artifacts
       continue;
     }
 
@@ -113,6 +114,7 @@ router.get("/artifacts", (req: Request, res: Response): any => {
         `❌ ERROR: Failed to read artifacts for ${projectName}:`,
         error
       );
+      artifacts[projectName] = []; // ✅ Prevent crashes, return empty array
     }
   }
 
