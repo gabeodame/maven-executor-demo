@@ -33,9 +33,11 @@ class SocketService {
     this.socket.on("maven-output", (data: string) => {
       console.log(`📡 [WebSocket] Maven Output: ${data}`);
       this.mavenLogs.push(data);
+
       if (data.includes("BUILD SUCCESS") || data.includes("BUILD FAILURE")) {
         this.setLoading(false);
       }
+
       this.notifySubscribers();
     });
 
@@ -98,6 +100,9 @@ class SocketService {
   private clearLogs() {
     console.log("⚙️ Clearing Maven logs...");
     this.mavenLogs = [];
+    if (this.clearCloneLogs.length) {
+      this.clearCloneLogs();
+    }
     this.notifySubscribers();
   }
 
@@ -116,6 +121,7 @@ class SocketService {
       return;
     }
 
+    // ✅ Always clear logs for a fresh start unless in a pipeline sequence
     if (type === "pipeline") {
       if (this.isFirstPipelineCommand) {
         this.clearLogs();
