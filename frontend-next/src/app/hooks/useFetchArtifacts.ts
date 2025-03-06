@@ -68,7 +68,7 @@ export const useArtifacts = () => {
       );
       setArtifacts(projectArtifacts);
     } catch (error) {
-      console.error("❌ Error fetching artifacts:", error);
+      console.warn("❌ Error fetching artifacts:", error);
       setArtifacts([]);
     } finally {
       setLoading(false);

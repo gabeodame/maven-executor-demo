@@ -335,7 +335,7 @@ router.post("/get-session", async (req, res): Promise<any> => {
 router.post(
   "/clone-repo",
   async (req: Request, res: Response): Promise<any> => {
-    const { repoUrl, branch = "main", projectName } = req.body;
+    const { repoUrl, branch = "main", projectName, pomPath } = req.body; // ✅ Accept pomPath
     const sessionId = req.headers["x-session-id"] as string;
 
     if (!sessionId) {
@@ -349,7 +349,13 @@ router.post(
     const safeRepoName =
       projectName?.replace(/[^a-zA-Z0-9-_]/g, "") ||
       path.basename(repoUrl, ".git");
+
     const repoPath = path.join(SESSION_WORKSPACE_DIR, sessionId, safeRepoName);
+
+    // ✅ Fix: Ensure pomPath is a string (fallback to default pom.xml)
+    const pomFilePath = pomPath
+      ? path.join(repoPath, pomPath)
+      : path.join(repoPath, "pom.xml");
 
     // ✅ Check if repo already exists before cloning
     if (fs.existsSync(repoPath)) {
@@ -376,7 +382,20 @@ router.post(
         throw new Error("Clone operation failed.");
       }
 
-      return res.json({ success: true, sessionId });
+      // ✅ Ensure pom.xml exists at the specified path
+      if (!fs.existsSync(pomFilePath)) {
+        console.error(
+          `❌ ERROR: No pom.xml found at ${pomFilePath}. Deleting repo.`
+        );
+        fs.rmSync(repoPath, { recursive: true, force: true });
+        throw new Error(
+          `Invalid project: pom.xml not found at ${
+            pomPath || "default location"
+          }`
+        );
+      }
+
+      return res.json({ success: true, sessionId, pomPath: pomFilePath });
     } catch (error) {
       console.error("❌ ERROR: Failed to clone repository", error);
 
@@ -387,6 +406,7 @@ router.post(
     }
   }
 );
+
 router.post("/select-project", (req: Request, res: Response): any => {
   const { projectName } = req.body;
   const sessionId = req.headers["x-session-id"] as string;

@@ -2,11 +2,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { Toaster, toast } from "sonner";
 import Accordion from "./ui/Accordion";
-
 import { useMenu } from "../store/MenuContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useSessionCache } from "../store/SessionProvider";
 import { useSelectedProject } from "../hooks/useSelectedProject";
+import CloneRepoForm from "./forms/CloneRepoForm";
+import { getBackEndUrl } from "../util/getbackEndUrl";
 
 interface Repository {
   id: number;
@@ -20,16 +21,18 @@ export default function RepoList() {
   const [cloning, setCloning] = useState<boolean>(false);
   const [cloned, setCloned] = useState<boolean>(false);
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
+  const [branch, setBranch] = useState("main");
+  const [projectName, setProjectName] = useState("");
+  const [pomPath, setPomPath] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const { toggleMenu } = useMenu();
   const isMobile = useIsMobile();
   const { sessionId } = useSessionCache();
-  const { selectProject } = useSelectedProject(); // ✅ Set global state when cloning
+  const { selectProject } = useSelectedProject();
 
-  const backendUrl =
-    process.env.NODE_ENV === "production"
-      ? process.env.NEXT_PUBLIC_VITE_API_URL!
-      : process.env.NEXT_PUBLIC_DEV_URL!;
+  const backendUrl = getBackEndUrl();
 
   console.log("🔒 Session ID:", sessionId);
 
@@ -69,6 +72,20 @@ export default function RepoList() {
     fetchRepos();
   }, [fetchRepos]);
 
+  // ✅ Handle repo selection
+  const handleRepoSelect = (repoName: string) => {
+    const selected = repos.find((repo) => repo.name === repoName);
+    if (selected) {
+      setSelectedRepo(selected);
+      setCloned(false);
+      setBranch("main");
+      setProjectName(selected.name);
+      setPomPath("");
+      setIsModalOpen(true);
+      setErrorMessage("");
+    }
+  };
+
   // ✅ Handle repository cloning
   const handleClone = async () => {
     if (!selectedRepo) {
@@ -78,12 +95,12 @@ export default function RepoList() {
 
     try {
       if (!sessionId) {
-        console.error("❌ No session ID found");
         toast.error("Session ID is missing. Please refresh and try again.");
         return;
       }
 
       setCloning(true);
+      setErrorMessage(""); // ✅ Reset error on new attempt
 
       const response = await fetch(`${backendUrl}/api/clone-repo`, {
         method: "POST",
@@ -93,30 +110,32 @@ export default function RepoList() {
         },
         body: JSON.stringify({
           repoUrl: selectedRepo.clone_url,
-          branch: "main",
-          projectName: selectedRepo.name,
+          branch,
+          projectName,
+          pomPath: pomPath || null,
         }),
       });
 
       const responseData = await response.json();
 
       if (!response.ok) {
-        toast.error(responseData.error || "Failed to clone repository");
+        setErrorMessage(responseData.error || "Failed to clone repository"); // ✅ Set error message state
+        toast.error(responseData.error);
         throw new Error(responseData.error);
       }
 
-      console.log("✅ Repo cloned successfully for session:", sessionId);
       toast.success(`Repository ${selectedRepo.name} cloned successfully`);
-
-      // ✅ Update global state only if the clone was successful
-      selectProject(selectedRepo.name);
+      selectProject(projectName);
 
       setCloned(true);
+      setIsModalOpen(false);
       if (isMobile) toggleMenu();
     } catch (error) {
       if (error instanceof Error) {
+        setErrorMessage(error.message); // ✅ Ensure error state updates
         toast.error(error.message);
       } else {
+        setErrorMessage("Something went wrong");
         toast.error("Failed to clone your repo");
       }
       setCloned(false);
@@ -124,6 +143,8 @@ export default function RepoList() {
       setCloning(false);
     }
   };
+
+  console.log(errorMessage);
 
   return (
     <Accordion
@@ -142,13 +163,7 @@ export default function RepoList() {
           <div className="space-y-4">
             <select
               value={selectedRepo?.name || ""}
-              onChange={(e) => {
-                const selected = repos.find(
-                  (repo) => repo.name === e.target.value
-                );
-                setSelectedRepo(selected || null);
-                setCloned(false);
-              }}
+              onChange={(e) => handleRepoSelect(e.target.value)}
               className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-cyan-500"
             >
               <option value="">-- Select a Repository --</option>
@@ -163,23 +178,26 @@ export default function RepoList() {
                   </option>
                 ))}
             </select>
-
-            <button
-              onClick={handleClone}
-              disabled={!selectedRepo || cloning || cloned}
-              className={`w-full text-white px-4 py-2 rounded-lg ease-in transition-all ${
-                cloning
-                  ? "bg-gray-600 cursor-not-allowed"
-                  : "bg-cyan-800 hover:bg-cyan-900 cursor-pointer"
-              }`}
-            >
-              {cloning
-                ? "Cloning..."
-                : cloned
-                ? `✅ Clone Successful`
-                : "Clone Repository"}
-            </button>
           </div>
+        )}
+
+        {/* ✅ Modal for repository details */}
+        {selectedRepo && (
+          <CloneRepoForm
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onClone={handleClone}
+            cloning={cloning}
+            cloned={cloned}
+            repoName={selectedRepo.name}
+            branch={branch}
+            setBranch={setBranch}
+            projectName={projectName}
+            setProjectName={setProjectName}
+            pomPath={pomPath}
+            setPomPath={setPomPath}
+            errorMessage={errorMessage}
+          />
         )}
 
         <Toaster />
