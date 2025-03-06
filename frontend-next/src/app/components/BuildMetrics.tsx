@@ -12,7 +12,7 @@ interface BuildMetrics {
 }
 
 export default function BuildMetrics() {
-  const { logs } = useSocket();
+  const { mavenLogs: logs } = useSocket();
   const [metrics, setMetrics] = useState<BuildMetrics>({
     status: "Pending",
     totalTime: null,

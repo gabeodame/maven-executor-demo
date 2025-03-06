@@ -2,12 +2,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { Toaster, toast } from "sonner";
 import Accordion from "./ui/Accordion";
-import { useMenu } from "../store/MenuContext";
-import { useIsMobile } from "../hooks/useIsMobile";
 import { useSessionCache } from "../store/SessionProvider";
-import { useSelectedProject } from "../hooks/useSelectedProject";
 import CloneRepoForm from "./forms/CloneRepoForm";
-import { getBackEndUrl } from "../util/getbackEndUrl";
+import { useSocket } from "../hooks/useSocket";
 
 interface Repository {
   id: number;
@@ -19,22 +16,16 @@ export default function RepoList() {
   const [repos, setRepos] = useState<Repository[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [cloning, setCloning] = useState<boolean>(false);
-  const [cloned, setCloned] = useState<boolean>(false);
+  // const [cloned, setCloned] = useState<boolean>(false);
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
   const [branch, setBranch] = useState("main");
   const [projectName, setProjectName] = useState("");
   const [pomPath, setPomPath] = useState("");
+  const [repoPath, setRepoPath] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-
-  const { toggleMenu } = useMenu();
-  const isMobile = useIsMobile();
+  // const [errorMessage, setErrorMessage] = useState("");
+  const { triggerClone, cloneLogs } = useSocket();
   const { sessionId } = useSessionCache();
-  const { selectProject } = useSelectedProject();
-
-  const backendUrl = getBackEndUrl();
-
-  console.log("🔒 Session ID:", sessionId);
 
   // ✅ Fetch GitHub repositories
   const fetchRepos = useMemo(() => {
@@ -46,9 +37,7 @@ export default function RepoList() {
           return;
         }
         const res = await fetch("/api/github/repos", {
-          headers: {
-            "x-session-id": sessionId,
-          },
+          headers: { "x-session-id": sessionId },
         });
 
         if (!res.ok) {
@@ -77,74 +66,70 @@ export default function RepoList() {
     const selected = repos.find((repo) => repo.name === repoName);
     if (selected) {
       setSelectedRepo(selected);
-      setCloned(false);
+      // setCloned(false);
       setBranch("main");
       setProjectName(selected.name);
       setPomPath("");
+      setRepoPath("");
       setIsModalOpen(true);
-      setErrorMessage("");
+      // setErrorMessage("");
     }
   };
 
   // ✅ Handle repository cloning
   const handleClone = async () => {
     if (!selectedRepo) {
-      toast.error("Select a repository to clone");
+      toast.error("❌ Select a repository to clone");
       return;
     }
 
+    if (!sessionId) {
+      toast.error("❌ Session ID is missing. Please refresh and try again.");
+      return;
+    }
+    setIsModalOpen(false);
+    // setCloning(true);
+    // setErrorMessage("");
+
     try {
-      if (!sessionId) {
-        toast.error("Session ID is missing. Please refresh and try again.");
-        return;
-      }
-
-      setCloning(true);
-      setErrorMessage(""); // ✅ Reset error on new attempt
-
-      const response = await fetch(`${backendUrl}/api/clone-repo`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-session-id": sessionId,
-        },
-        body: JSON.stringify({
-          repoUrl: selectedRepo.clone_url,
-          branch,
-          projectName,
-          pomPath: pomPath || null,
-        }),
-      });
-
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        setErrorMessage(responseData.error || "Failed to clone repository"); // ✅ Set error message state
-        toast.error(responseData.error);
-        throw new Error(responseData.error);
-      }
-
-      toast.success(`Repository ${selectedRepo.name} cloned successfully`);
-      selectProject(projectName);
-
-      setCloned(true);
-      setIsModalOpen(false);
-      if (isMobile) toggleMenu();
+      await triggerClone(
+        selectedRepo.clone_url,
+        branch,
+        projectName,
+        repoPath,
+        pomPath
+      );
+      toast.success(`🎉 Successfully cloned ${selectedRepo.name}`);
+      // setCloned(true);
     } catch (error) {
-      if (error instanceof Error) {
-        setErrorMessage(error.message); // ✅ Ensure error state updates
-        toast.error(error.message);
-      } else {
-        setErrorMessage("Something went wrong");
-        toast.error("Failed to clone your repo");
-      }
-      setCloned(false);
+      console.error("❌ Clone failed:", error);
+      toast.error(
+        `❌ Clone failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+      // setErrorMessage(error instanceof Error ? error.message : "Unknown error");
     } finally {
-      setCloning(false);
+      // setCloning(false);
     }
   };
 
-  console.log(errorMessage);
+  // ✅ Handle clone success or error
+  useEffect(() => {
+    if (cloning) {
+      const lastLog = cloneLogs[cloneLogs.length - 1] || "";
+      if (lastLog.includes("✅ Repository cloned successfully")) {
+        toast.success(`✅ ${selectedRepo?.name} cloned successfully`);
+        // setCloned(true);
+        setIsModalOpen(false);
+        setCloning(false);
+      } else if (lastLog.includes("❌ ERROR")) {
+        toast.error(lastLog);
+        // setErrorMessage(lastLog);
+        setCloning(false);
+      }
+    }
+  }, [cloneLogs, cloning, selectedRepo]);
 
   return (
     <Accordion
@@ -167,28 +152,22 @@ export default function RepoList() {
               className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-cyan-500"
             >
               <option value="">-- Select a Repository --</option>
-              {Array.isArray(repos) &&
-                repos?.map((repo) => (
-                  <option
-                    key={repo.id}
-                    value={repo.name}
-                    className="bg-blue-700"
-                  >
-                    {repo.name}
-                  </option>
-                ))}
+              {repos?.map((repo) => (
+                <option key={repo.id} value={repo.name} className="bg-blue-700">
+                  {repo.name}
+                </option>
+              ))}
             </select>
           </div>
         )}
 
-        {/* ✅ Modal for repository details */}
         {selectedRepo && (
           <CloneRepoForm
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
             onClone={handleClone}
-            cloning={cloning}
-            cloned={cloned}
+            // cloning={cloning}
+            // cloned={cloned}
             repoName={selectedRepo.name}
             branch={branch}
             setBranch={setBranch}
@@ -196,7 +175,9 @@ export default function RepoList() {
             setProjectName={setProjectName}
             pomPath={pomPath}
             setPomPath={setPomPath}
-            errorMessage={errorMessage}
+            // errorMessage={errorMessage}
+            repoPath={repoPath}
+            setRepoPath={setRepoPath}
           />
         )}
 

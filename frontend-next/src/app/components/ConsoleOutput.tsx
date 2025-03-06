@@ -31,7 +31,7 @@ const getLogColor = (log: string) => {
 const ConsoleOutput = () => {
   const [receivedLogs, setReceivedLogs] = useState<string[]>([]);
   const { sessionId } = useSessionCache();
-  const { logs } = useSocket();
+  const { cloneLogs, mavenLogs } = useSocket();
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,8 +43,14 @@ const ConsoleOutput = () => {
       ]);
       return;
     }
-    setReceivedLogs(logs);
-  }, [logs, sessionId]);
+
+    // ✅ Append logs from both sources
+    setReceivedLogs((prevLogs) => [
+      ...prevLogs,
+      ...cloneLogs.filter((log) => !prevLogs.includes(log)), // Avoid duplicates
+      ...mavenLogs.filter((log) => !prevLogs.includes(log)),
+    ]);
+  }, [mavenLogs, sessionId, cloneLogs]);
 
   // Auto-scroll to the latest log
   useEffect(() => {

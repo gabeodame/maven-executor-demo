@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import SocketService from "../services/SocketService";
-
 import { useSession } from "next-auth/react";
 import { useSessionCache } from "../store/SessionProvider";
 
@@ -12,10 +11,11 @@ export const useSocket = () => {
   const [socketService, setSocketService] = useState<SocketService | null>(
     null
   );
-  const [logs, setLogs] = useState<string[]>([]);
+  const [mavenLogs, setMavenLogs] = useState<string[]>([]);
+  const [cloneLogs, setCloneLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [commandCompleted, setCommandCompleted] = useState(false); // ✅ NEW: Track command completion
+  const [commandCompleted, setCommandCompleted] = useState(false);
 
   useEffect(() => {
     if (!sessionId || sessionId.trim() === "") {
@@ -31,14 +31,25 @@ export const useSocket = () => {
     setSocketService(newSocketService);
     setIsConnected(true);
 
-    // Subscribe to WebSocket logs and loading state
-    const unsubscribe = newSocketService.subscribe((newLogs, isLoading) => {
-      setLogs(newLogs);
-      setLoading(isLoading);
-      if (!isLoading) {
-        console.log("✅ Command Execution Completed! Triggering re-fetch.");
-        setCommandCompleted((prev) => !prev); // ✅ Toggle to trigger effects
+    // ✅ Subscribe to Maven logs
+    const unsubscribeMaven = newSocketService.subscribe(
+      (newLogs, isLoading) => {
+        setMavenLogs((prevLogs) => [
+          ...prevLogs,
+          ...newLogs.filter((log) => !prevLogs.includes(log)),
+        ]);
+        setLoading(isLoading);
+        if (!isLoading) setCommandCompleted((prev) => !prev);
       }
+    );
+
+    // ✅ Subscribe to Clone logs
+    const unsubscribeClone = newSocketService.subscribeCloneLogs((newLogs) => {
+      console.log("📡 [Clone Process Log Update]", newLogs);
+      setCloneLogs((prevLogs) => [
+        ...prevLogs,
+        ...newLogs.filter((log) => !prevLogs.includes(log)),
+      ]);
     });
 
     return () => {
@@ -46,13 +57,15 @@ export const useSocket = () => {
         "🔌 useSocket: Cleaning up WebSocket for session:",
         sessionId
       );
-      unsubscribe();
+      unsubscribeMaven();
+      unsubscribeClone();
       setSocketService(null);
       setIsConnected(false);
     };
   }, [sessionId]);
 
-  const runMavenCommand = (cmd: string, type?: string) => {
+  // ✅ Function to run Maven command
+  const runMavenCommand = (cmd: string, type?: "pipeline" | "normal") => {
     if (!socketService || !isConnected) {
       console.warn(
         "⚠️ useSocket: Cannot send command, WebSocket is not connected."
@@ -62,15 +75,92 @@ export const useSocket = () => {
     console.log(
       `▶️ [CLIENT] Sending command: mvn ${cmd} | Session ID: ${sessionId}`
     );
-    setCommandCompleted(false); // ✅ Reset state before sending a command
+    setCommandCompleted(false);
     socketService.runMavenCommand(cmd, type);
   };
 
+  // ✅ Function to trigger repository clone
+  const triggerClone = async (
+    repoUrl: string,
+    branch: string,
+    projectName?: string,
+    repoPath?: string,
+    pomPath?: string
+  ): Promise<void> => {
+    if (!socketService || !isConnected) {
+      console.warn(
+        "⚠️ useSocket: Cannot send clone request, WebSocket is not connected."
+      );
+      return Promise.reject(new Error("WebSocket is not connected."));
+    }
+
+    console.log(
+      `▶️ [CLIENT] Triggering repository clone: ${repoUrl} | Branch: ${branch}`
+    );
+    setCloneLogs([]); // ✅ Clear previous logs before starting
+
+    return new Promise<void>((resolve, reject) => {
+      let hasCompleted = false;
+
+      // ✅ Define `handleCloneLog` first
+      const handleCloneLog = (log: string) => {
+        console.log("📡 [Clone Log]", log);
+        setCloneLogs((prevLogs) => [...prevLogs, log]);
+
+        if (!hasCompleted) {
+          if (log.includes("✅ Repository cloned successfully")) {
+            console.log("🎉 Clone operation successful!");
+            hasCompleted = true; // ✅ Mark as completed
+            unsubscribeClone(); // ✅ Unsubscribe WebSocket
+            resolve();
+          } else if (log.includes("❌ ERROR")) {
+            console.error("❌ Clone operation failed!", log);
+            hasCompleted = true; // ✅ Mark as completed
+            unsubscribeClone();
+            reject(new Error(log));
+          }
+        }
+      };
+
+      // ✅ Subscribe AFTER defining `handleCloneLog`
+      const unsubscribeClone = socketService.subscribeCloneLogs((newLogs) => {
+        newLogs.forEach(handleCloneLog);
+      });
+
+      // ✅ Use `getSocket()` to validate WebSocket
+      const socket = socketService.getSocket();
+      if (socket) {
+        socketService.triggerCloneRepo(
+          repoUrl,
+          branch,
+          projectName,
+          repoPath,
+          pomPath
+        );
+      } else {
+        console.error("❌ ERROR: Socket connection is missing or invalid.");
+        unsubscribeClone();
+        reject(new Error("WebSocket connection is unavailable."));
+      }
+
+      // ✅ Timeout after 30s if no success/failure message is received
+      setTimeout(() => {
+        if (!hasCompleted) {
+          console.error("⏳ Clone operation timed out.");
+          unsubscribeClone();
+          reject(new Error("Clone operation timed out."));
+        }
+      }, 30000);
+    });
+  };
+
   return {
-    logs,
+    mavenLogs,
+    cloneLogs,
     loading,
-    runMavenCommand,
     isConnected,
-    commandCompleted, // ✅ Return state so other hooks can listen
+    runMavenCommand,
+    triggerClone,
+    commandCompleted,
   };
 };

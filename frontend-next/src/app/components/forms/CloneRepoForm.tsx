@@ -10,13 +10,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useMenu } from "@/app/store/MenuContext";
 
 interface CloneRepoFormProps {
   isOpen: boolean;
   onClose: () => void;
   onClone: () => void;
-  cloning: boolean;
-  cloned: boolean;
+  //   cloning: boolean;
+  //   cloned: boolean;
   repoName: string;
   branch: string;
   setBranch: (value: string) => void;
@@ -24,15 +25,17 @@ interface CloneRepoFormProps {
   setProjectName: (value: string) => void;
   pomPath: string;
   setPomPath: (value: string) => void;
-  errorMessage: string;
+  //   errorMessage: string;
+  repoPath: string;
+  setRepoPath: (value: string) => void;
 }
 
-const CloneRepoForm: React.FC<CloneRepoFormProps> = ({
+const CloneRepoForm = ({
   isOpen,
   onClose,
   onClone,
-  cloning,
-  cloned,
+  //   cloning,
+  //   cloned,
   repoName,
   branch,
   setBranch,
@@ -40,9 +43,11 @@ const CloneRepoForm: React.FC<CloneRepoFormProps> = ({
   setProjectName,
   pomPath,
   setPomPath,
-  errorMessage,
-}) => {
-  console.log(errorMessage);
+  //   errorMessage,
+  repoPath,
+  setRepoPath,
+}: CloneRepoFormProps) => {
+  const { toggleMenu } = useMenu();
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="bg-gray-900 text-white">
@@ -53,70 +58,53 @@ const CloneRepoForm: React.FC<CloneRepoFormProps> = ({
         </DialogHeader>
 
         <div className="space-y-3">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="branch">Branch</Label>
-            <Input
-              id="branch"
-              type="text"
-              value={branch}
-              onChange={(e) => setBranch(e.target.value)}
-              placeholder="Branch (e.g., main, develop, feature/*)"
-              className="w-full p-2 rounded-lg bg-gray-800 border border-gray-700"
-            />
-          </div>
+          <Label htmlFor="branch">Branch</Label>
+          <Input
+            id="branch"
+            type="text"
+            value={branch}
+            onChange={(e) => setBranch(e.target.value)}
+          />
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="project-name">Project Name</Label>
-            <Input
-              id="project-name"
-              type="text"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              placeholder="Project Name (optional)"
-              className="w-full p-2 rounded-lg bg-gray-800 border border-gray-700"
-            />
-          </div>
+          <Label htmlFor="project-name">Project Name</Label>
+          <Input
+            id="project-name"
+            type="text"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+          />
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="pom-path">Custom pom.xml Path</Label>
-            <Input
-              id="pom-path"
-              type="text"
-              value={pomPath}
-              onChange={(e) => setPomPath(e.target.value)}
-              placeholder="e.g., /pom.xml or /backend/pom.xml"
-              className="w-full p-2 rounded-lg bg-gray-800 border border-gray-700"
-            />
-          </div>
+          <Label htmlFor="pom-path">Custom pom.xml Path</Label>
+          <Input
+            id="pom-path"
+            type="text"
+            value={pomPath}
+            onChange={(e) => setPomPath(e.target.value)}
+          />
+
+          <Label htmlFor="repo-path">Repository Subdirectory (optional)</Label>
+          <Input
+            id="repo-path"
+            type="text"
+            value={repoPath}
+            onChange={(e) => setRepoPath(e.target.value)}
+          />
+
+          {/* {errorMessage && <div className="text-red-600">{errorMessage}</div>} */}
         </div>
-        {/* ✅ Display error message */}
-        {errorMessage && (
-          <div className="text-sm text-center font-bold bg-red-800 text-white p-2 rounded-md">
-            {errorMessage}
-          </div>
-        )}
 
-        <DialogFooter className="flex flex-col gap-2 mt-4">
+        <DialogFooter>
           <Button
-            onClick={onClose}
-            variant="destructive"
-            className="px-4 py-2 bg-red-900 hover:bg-red-700 text-white rounded-lg ease-in transition-colors"
+            onClick={() => {
+              onClone();
+              toggleMenu();
+              onClose();
+            }}
           >
-            Cancel
+            🔂 Clone Repo
           </Button>
-          <Button
-            onClick={onClone}
-            disabled={cloning}
-            variant="default"
-            className="px-4 py-2 bg-green-900 hover:bg-green-700 text-white rounded-lg flex justify-center items-center ease-in transition-colors"
-          >
-            {cloning ? (
-              <>🔄 Cloning...</>
-            ) : cloned ? (
-              <>🎉 Cloned!</>
-            ) : (
-              <>🔂 Clone Repo</>
-            )}
+          <Button onClick={onClose} variant="destructive">
+            Cancel
           </Button>
         </DialogFooter>
       </DialogContent>

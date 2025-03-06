@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from "express";
+import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
@@ -6,6 +6,7 @@ import serverRoutes from "./routes/serverRoutes";
 import { runMavenCommand } from "./services/mavenService";
 import { config } from "./config/env";
 import { cleanupInactiveWorkspaces } from "./services/cleanInactiveWorkspaces";
+import { setupSocketRoutes } from "./routes/socketRoutes"; // ✅ Ensure WebSocket routes are included
 
 const app = express();
 const server = http.createServer(app);
@@ -15,7 +16,7 @@ const allowedOrigins = config.ALLOWED_ORIGINS || [
   "https://maven-executor-demo.vercel.app",
 ];
 
-// ✅ Apply consistent CORS for both Express and Socket.io
+// ✅ Apply consistent CORS for both Express and WebSockets
 const corsOptions = {
   origin: (
     origin: string | undefined,
@@ -38,10 +39,8 @@ const corsOptions = {
   ],
 };
 
-// ✅ Use same CORS settings for Express and WebSockets
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions)); // ✅ Proper preflight handling
-
+app.options("*", cors(corsOptions));
 app.use(express.json());
 
 // ✅ Register API Routes
@@ -53,22 +52,13 @@ cleanupInactiveWorkspaces();
 // ✅ Setup WebSocket Server with Correct CORS
 const io = new Server(server, {
   cors: corsOptions,
+  transports: ["websocket", "polling"], // ✅ Ensure WebSocket & polling fallback
+  path: "/socket.io/", // ✅ Ensure WebSocket path matches frontend
 });
 
-io.on("connection", (socket) => {
-  console.log("✅ WebSocket Client connected");
+// ✅ Attach WebSocket routes
+setupSocketRoutes(io);
 
-  socket.on("run-maven", (command) => {
-    console.log(`🚀 Running Maven Command: ${command}`);
-    runMavenCommand(io, socket, command);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("❌ WebSocket Client disconnected");
-  });
-});
-
-// ✅ Start Server
 server.listen(config.PORT, () => {
   console.log(`✅ Backend Server running on port ${config.PORT}`);
 });

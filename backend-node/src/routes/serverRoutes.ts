@@ -8,7 +8,7 @@ import {
   SESSION_WORKSPACE_DIR,
   setJavaProjectPath,
 } from "../config/projectPaths";
-import { cloneRepository } from "../services/gitService";
+import { cloneRepository } from "../services/cloneRepository";
 import { getBuildMetrics } from "../services/mavenService";
 
 import { execSync } from "child_process";
@@ -335,7 +335,13 @@ router.post("/get-session", async (req, res): Promise<any> => {
 router.post(
   "/clone-repo",
   async (req: Request, res: Response): Promise<any> => {
-    const { repoUrl, branch = "main", projectName, pomPath } = req.body; // ✅ Accept pomPath
+    const {
+      repoUrl,
+      branch = "main",
+      projectName,
+      repoPath,
+      pomPath,
+    } = req.body;
     const sessionId = req.headers["x-session-id"] as string;
 
     if (!sessionId) {
@@ -349,53 +355,30 @@ router.post(
     const safeRepoName =
       projectName?.replace(/[^a-zA-Z0-9-_]/g, "") ||
       path.basename(repoUrl, ".git");
-
-    const repoPath = path.join(SESSION_WORKSPACE_DIR, sessionId, safeRepoName);
-
-    // ✅ Fix: Ensure pomPath is a string (fallback to default pom.xml)
-    const pomFilePath = pomPath
-      ? path.join(repoPath, pomPath)
-      : path.join(repoPath, "pom.xml");
-
-    // ✅ Check if repo already exists before cloning
-    if (fs.existsSync(repoPath)) {
-      console.log(`⚠️ Repo already exists: ${repoPath}`);
-      return res.json({
-        success: true,
-        message: "Repository already cloned",
-        sessionId,
-      });
-    }
+    const fullRepoPath = path.join(
+      SESSION_WORKSPACE_DIR,
+      sessionId,
+      safeRepoName
+    );
 
     console.log(`📂 Cloning repo: ${repoUrl} on branch ${branch}`);
 
     try {
-      const clonedPath = cloneRepository(
+      const clonedPath = await cloneRepository(
         repoUrl,
         branch,
         sessionId,
-        safeRepoName
+        safeRepoName,
+        repoPath,
+        pomPath
       );
 
-      // ✅ Validate cloning success
+      // ✅ Validate successful cloning
       if (!fs.existsSync(clonedPath)) {
         throw new Error("Clone operation failed.");
       }
 
-      // ✅ Ensure pom.xml exists at the specified path
-      if (!fs.existsSync(pomFilePath)) {
-        console.error(
-          `❌ ERROR: No pom.xml found at ${pomFilePath}. Deleting repo.`
-        );
-        fs.rmSync(repoPath, { recursive: true, force: true });
-        throw new Error(
-          `Invalid project: pom.xml not found at ${
-            pomPath || "default location"
-          }`
-        );
-      }
-
-      return res.json({ success: true, sessionId, pomPath: pomFilePath });
+      return res.json({ success: true, sessionId, repoPath: clonedPath });
     } catch (error) {
       console.error("❌ ERROR: Failed to clone repository", error);
 
