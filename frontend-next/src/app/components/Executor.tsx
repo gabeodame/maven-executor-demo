@@ -12,7 +12,7 @@ const Executor = () => {
   };
 
   return (
-    <div className="w-full flex flex-wrap justify-center gap-2 sm:gap-3">
+    <div className="w-full flex flex-wrap justify-center gap-2 sm:gap-3 p-4">
       {["validate", "compile", "test", "package", "clean"].map((cmd) => (
         <div
           key={cmd}

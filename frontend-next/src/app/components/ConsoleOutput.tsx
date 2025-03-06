@@ -52,16 +52,15 @@ const ConsoleOutput = () => {
     ]);
   }, [mavenLogs, sessionId, cloneLogs]);
 
-  // Auto-scroll to the latest log
+  // ✅ Auto-scroll to the latest log
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [receivedLogs]);
 
   return (
     <div
-      className={`flex flex-col flex-grow overflow-auto bg-gray-800 text-white p-3 font-mono rounded-md border border-gray-700
-        h-[30vh] sm:h-[40vh] md:h-[50vh] 
-        lg:h-[calc(100vh-160px-60px-80px)] xl:h-[calc(100vh-180px-60px-80px)]`}
+      className="flex flex-col flex-1 overflow-auto bg-gray-800 text-white p-3 font-mono rounded-md border border-gray-700"
+      style={{ minHeight: "30vh", maxHeight: "calc(100vh - 290px)" }}
     >
       {receivedLogs.map((log, index) => (
         <div

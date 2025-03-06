@@ -132,20 +132,20 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col w-full`}
       >
         <ContextProvider>
-          {/* ✅ Header with Sticky Positioning */}
-          <header className="w-full h-20 flex justify-between items-center bg-gray-800 shadow-md text-white px-4 fixed top-0 left-0 z-50">
-            <h1 className="text-2xl sm:text-2xl font-bold flex items-center gap-2">
+          {/* ✅ Sticky Header */}
+          <header className="w-full h-16 sm:h-20 flex justify-between items-center bg-gray-800 shadow-md text-white px-4 fixed top-0 left-0 z-50">
+            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
               📦 Maven Command Executor
             </h1>
             <MobileMenu />
           </header>
 
-          {/* ✅ Main Layout */}
-          <main className="w-full h-full flex-grow bg-gray-900 mt-20">
+          {/* ✅ Main Layout (Takes Full Remaining Height) */}
+          <main className="w-full flex-grow flex flex-col bg-gray-900 mt-16 sm:mt-20 overflow-hidden">
             {children}
           </main>
 
-          {/* ✅ Footer */}
+          {/* ✅ Footer (Fixed at Bottom) */}
           <Footer />
         </ContextProvider>
       </body>
