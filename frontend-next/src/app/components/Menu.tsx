@@ -2,12 +2,12 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 
-import { useMenu } from "../store/MenuContext";
 import MavenDebugTools from "./MavenDebugTools";
 import MavenDependencyTools from "./MavenDependencyTools";
 import MavenExecutionTools from "./MavenExecutionTools";
 import MavenPipeline from "./MavenPipeline";
 import UserAccount from "./UserAccount";
+import { useMenu } from "../store/MenuContext";
 
 const MobileMenu = () => {
   const { isOpen, toggleMenu } = useMenu();

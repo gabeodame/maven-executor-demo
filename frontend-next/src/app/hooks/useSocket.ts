@@ -7,7 +7,7 @@ import { useSessionCache } from "../store/SessionProvider";
 export const useSocket = () => {
   const { sessionId: cachedSessionId } = useSessionCache() || { sessionId: "" };
   const { data: session } = useSession();
-  const sessionId = session?.user?.id || cachedSessionId; // Use authenticated session or guest session
+  const sessionId = session?.user?.id || cachedSessionId;
 
   const [socketService, setSocketService] = useState<SocketService | null>(
     null
@@ -15,11 +15,12 @@ export const useSocket = () => {
   const [logs, setLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [commandCompleted, setCommandCompleted] = useState(false); // ✅ NEW: Track command completion
 
   useEffect(() => {
     if (!sessionId || sessionId.trim() === "") {
       console.warn(
-        "⚠️ useSocket: No session ID available! Skipping WebSocket initialization."
+        "⚠️ useSocket: No session ID available! Skipping WebSocket."
       );
       return;
     }
@@ -34,6 +35,10 @@ export const useSocket = () => {
     const unsubscribe = newSocketService.subscribe((newLogs, isLoading) => {
       setLogs(newLogs);
       setLoading(isLoading);
+      if (!isLoading) {
+        console.log("✅ Command Execution Completed! Triggering re-fetch.");
+        setCommandCompleted((prev) => !prev); // ✅ Toggle to trigger effects
+      }
     });
 
     return () => {
@@ -47,7 +52,6 @@ export const useSocket = () => {
     };
   }, [sessionId]);
 
-  // ✅ Ensure runMavenCommand does nothing if WebSocket is not connected
   const runMavenCommand = (cmd: string, type?: string) => {
     if (!socketService || !isConnected) {
       console.warn(
@@ -58,6 +62,7 @@ export const useSocket = () => {
     console.log(
       `▶️ [CLIENT] Sending command: mvn ${cmd} | Session ID: ${sessionId}`
     );
+    setCommandCompleted(false); // ✅ Reset state before sending a command
     socketService.runMavenCommand(cmd, type);
   };
 
@@ -66,5 +71,6 @@ export const useSocket = () => {
     loading,
     runMavenCommand,
     isConnected,
+    commandCompleted, // ✅ Return state so other hooks can listen
   };
 };

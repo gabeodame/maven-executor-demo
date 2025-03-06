@@ -4,8 +4,8 @@ import React, { useEffect, useState, useCallback } from "react";
 import Accordion from "./ui/Accordion";
 import ProjectItem from "./ProjectItem";
 import { useSessionCache } from "../store/SessionProvider";
-import { useSelectedProject } from "../hooks/useSelectProject";
 import { getBackEndUrl } from "../util/getbackEndUrl";
+import { useSelectedProject } from "../hooks/useSelectedProject";
 
 const PROJECT_STORAGE_KEY = "selectedProject";
 
@@ -14,7 +14,7 @@ function ProjectList() {
   const { selectProject, selectedProject } = useSelectedProject();
   const { sessionId } = useSessionCache();
 
-  // ✅ Fetch projects from backend
+  // ✅ Fetch Projects
   const fetchProjects = useCallback(async () => {
     if (!sessionId) return;
 
@@ -31,22 +31,21 @@ function ProjectList() {
       console.log("📂 Fetched Projects:", projectList);
       setProjects(projectList);
 
-      // ✅ Restore Cached Project or Default to First if No Selection
+      // ✅ Ensure global state stays in sync
       const cachedProject = localStorage.getItem(PROJECT_STORAGE_KEY);
-      if (!selectedProject || !projectList.includes(selectedProject)) {
-        const projectToSelect =
-          cachedProject && projectList.includes(cachedProject)
-            ? cachedProject
-            : projectList[0];
-
-        if (projectToSelect) selectProject(projectToSelect);
+      if (cachedProject && projectList.includes(cachedProject)) {
+        if (cachedProject !== selectedProject) {
+          selectProject(cachedProject); // ✅ Set global state
+        }
+      } else if (projectList.length > 0 && selectedProject !== projectList[0]) {
+        selectProject(projectList[0]); // ✅ Default to first project
       }
     } catch (error) {
       console.error("❌ Error fetching projects:", error);
     }
-  }, [sessionId, selectProject, selectedProject]);
+  }, [sessionId, selectedProject, selectProject]);
 
-  // ✅ Fetch projects on mount or session change
+  // ✅ Fetch projects on sessionId change or first mount
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
@@ -57,11 +56,11 @@ function ProjectList() {
       bgColor="bg-gray-500"
       hoverColor="hover:bg-gray-600"
     >
-      {projects.length ? (
+      {projects.length > 0 ? (
         <div className="space-y-2">
           {projects.map((project, idx) => (
             <ProjectItem
-              key={project} // ✅ Use project name as key
+              key={project}
               project={project}
               handleSelectProject={() => selectProject(project)}
               selectedProject={selectedProject}

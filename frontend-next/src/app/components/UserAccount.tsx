@@ -5,7 +5,6 @@ import Login from "./Login";
 import RepoList from "./RepoList";
 import { useSession, signOut } from "next-auth/react";
 import ProjectList from "./ProjectList";
-
 import { useMenu } from "../store/MenuContext";
 import { useSessionCache } from "../store/SessionProvider";
 
@@ -14,9 +13,10 @@ function UserAccount() {
   const { sessionId: cachedSessionId } = useSessionCache();
   const [isGithubUser, setIsGithubUser] = useState(false);
   const [isClient, setIsClient] = useState(false); // ✅ Prevent SSR mismatch
-  const { toggleMenu } = useMenu();
+  const { isOpen, toggleMenu } = useMenu(); // ✅ Track menu open state
 
   const sessionId = session?.user?.id || cachedSessionId;
+
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -32,16 +32,13 @@ function UserAccount() {
   const handleSignOut = async () => {
     localStorage.removeItem("sessionId");
     if (isGithubUser) {
-      await signOut({ callbackUrl: "/" }); // ✅ Redirects to home
+      await signOut({ callbackUrl: "/" });
     } else {
-      window.location.reload(); // ✅ Only reload for guest users
+      window.location.reload();
     }
   };
 
-  // ✅ Prevent rendering before hydration
-  if (!isClient) return null;
-
-  console.log(status);
+  if (!isClient) return null; // ✅ Prevent hydration mismatch
 
   return (
     <div className="w-full flex flex-col gap-2 mb-6">
@@ -52,11 +49,11 @@ function UserAccount() {
           <button
             className="w-full px-4 py-2 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700 ease-in transition-all cursor-pointer"
             onClick={() => {
-              toggleMenu();
               handleSignOut();
+              if (!isOpen) toggleMenu(); // ✅ Prevent unnecessary triggers
             }}
           >
-            SignOut
+            Sign Out
           </button>
         )}
       </div>

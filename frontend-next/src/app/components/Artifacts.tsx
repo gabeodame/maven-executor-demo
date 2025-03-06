@@ -5,9 +5,10 @@ import { useSocket } from "../hooks/useSocket";
 import Accordion from "./ui/Accordion";
 import { useArtifacts } from "../hooks/useFetchArtifacts";
 import ArtifactItem from "./ArtifactItem";
-import { useSelectedProject } from "../hooks/useSelectProject";
+
 import { getBackEndUrl } from "../util/getbackEndUrl";
 import { useSessionCache } from "../store/SessionProvider";
+import { useSelectedProject } from "../hooks/useSelectedProject";
 
 interface Artifact {
   name: string;
@@ -32,7 +33,7 @@ export default function Artifacts() {
   useEffect(() => {
     console.log(`🎯 Re-fetching artifacts for new project: ${selectedProject}`);
     fetchArtifacts();
-  }, [selectedProject]);
+  }, [selectedProject, fetchArtifacts]);
 
   const handleDownload = (filePath: string) => {
     const downloadUrl = `${backendUrl}/api/download?file=${encodeURIComponent(

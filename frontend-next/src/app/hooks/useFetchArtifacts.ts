@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useSelectedProject } from "./useSelectProject";
+
 import { useSessionCache } from "../store/SessionProvider";
+import { useSocket } from "./useSocket"; // ✅ Listen for command completion
+import { useSelectedProject } from "./useSelectedProject";
 
 interface Artifact {
   name: string;
@@ -13,6 +15,7 @@ interface Artifact {
 export const useArtifacts = () => {
   const { sessionId } = useSessionCache();
   const { selectedProject } = useSelectedProject();
+  const { commandCompleted } = useSocket(); // ✅ Detect when a command completes
 
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [loading, setLoading] = useState(false);
@@ -23,7 +26,6 @@ export const useArtifacts = () => {
       "https://maven-executor-demo.fly.dev"
     : "http://localhost:5001";
 
-  // ✅ Fetch only artifacts for the selected project
   const fetchArtifacts = useCallback(async () => {
     if (!sessionId || !selectedProject) {
       console.warn("⚠️ No session ID or selected project. Skipping fetch.");
@@ -53,14 +55,12 @@ export const useArtifacts = () => {
 
       const data = await res.json();
 
-      // ✅ Ensure correct data structure
       if (!data || typeof data !== "object") {
         console.error("❌ Unexpected API response:", data);
-        setArtifacts([]); // Fallback to empty array
+        setArtifacts([]);
         return;
       }
 
-      // ✅ Extract artifacts for the selected project
       const projectArtifacts = data[selectedProject] || [];
       console.log(
         `📦 Artifacts updated for ${selectedProject}:`,
@@ -69,16 +69,18 @@ export const useArtifacts = () => {
       setArtifacts(projectArtifacts);
     } catch (error) {
       console.error("❌ Error fetching artifacts:", error);
-      setArtifacts([]); // Fallback to empty array on error
+      setArtifacts([]);
     } finally {
       setLoading(false);
     }
   }, [sessionId, selectedProject, backendUrl]);
 
-  // ✅ Re-fetch artifacts when `selectedProject` changes
+  // ✅ Re-fetch artifacts when:
+  //    1. `selectedProject` changes
+  //    2. `commandCompleted` toggles (indicating a new build was created)
   useEffect(() => {
     fetchArtifacts();
-  }, [selectedProject, fetchArtifacts]);
+  }, [selectedProject, commandCompleted, fetchArtifacts]);
 
   return { artifacts, loading, fetchArtifacts, setArtifacts };
 };

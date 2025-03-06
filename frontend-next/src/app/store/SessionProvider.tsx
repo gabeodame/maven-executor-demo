@@ -10,8 +10,6 @@ import {
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { getBackEndUrl } from "../util/getbackEndUrl";
-import { useMenu } from "./MenuContext"; // ✅ Ensure correct import path
-import { useIsMobile } from "../hooks/useIsMobile";
 
 const SESSION_STORAGE_KEY = "sessionId";
 const PROJECT_STORAGE_KEY = "selectedProject";
@@ -35,8 +33,6 @@ export const SessionProvider = ({
 }) => {
   const { data: session, status } = useSession();
   const backendUrl = getBackEndUrl();
-  const { toggleMenu } = useMenu(); // ✅ Will work now that MenuProvider comes first
-  const isMobile = useIsMobile();
 
   const [sessionId, setSessionId] = useState<string | null>(() =>
     typeof window !== "undefined"
@@ -52,14 +48,15 @@ export const SessionProvider = ({
 
   const [projects, setProjects] = useState<string[]>([]);
 
+  // ✅ Sync session on login
   useEffect(() => {
     if (status === "authenticated" && session?.user?.id) {
-      console.log("🔄 Updating stored session to:", session.user.id);
       localStorage.setItem(SESSION_STORAGE_KEY, session.user.id);
       setSessionId(session.user.id);
     }
   }, [session, status]);
 
+  // ✅ Fetch guest session if needed
   const fetchGuestSession = async () => {
     try {
       const res = await fetch(`${backendUrl}/api/get-session`, {
@@ -68,7 +65,6 @@ export const SessionProvider = ({
       if (!res.ok) throw new Error("Failed to fetch session ID");
 
       const data = await res.json();
-      console.log("✅ Guest session created:", data.sessionId);
       localStorage.setItem(SESSION_STORAGE_KEY, data.sessionId);
       setSessionId(data.sessionId);
     } catch (error) {
@@ -76,6 +72,7 @@ export const SessionProvider = ({
     }
   };
 
+  // ✅ Fetch projects & restore cached project
   useEffect(() => {
     if (!sessionId) return;
 
@@ -92,7 +89,11 @@ export const SessionProvider = ({
         if (Array.isArray(fetchedProjects) && fetchedProjects.length > 0) {
           setProjects(fetchedProjects);
 
-          if (!selectedProject || !fetchedProjects.includes(selectedProject)) {
+          // ✅ Restore cached project or default to first
+          const cachedProject = localStorage.getItem(PROJECT_STORAGE_KEY);
+          if (cachedProject && fetchedProjects.includes(cachedProject)) {
+            setSelectedProject(cachedProject);
+          } else {
             setSelectedProject(fetchedProjects[0]);
             localStorage.setItem(PROJECT_STORAGE_KEY, fetchedProjects[0]);
           }
@@ -105,6 +106,7 @@ export const SessionProvider = ({
     fetchProjects();
   }, [sessionId, backendUrl]);
 
+  // ✅ Select a project without triggering UI
   const selectProject = useCallback(
     async (project: string) => {
       if (!project || project === selectedProject) return;
@@ -131,14 +133,13 @@ export const SessionProvider = ({
           toast.error("Failed to select project.");
         } else {
           toast.success(`✅ Project switched to ${project}`);
-          if (isMobile) toggleMenu();
         }
       } catch (error) {
         console.error("❌ Project selection error:", error);
         toast.error("Failed to select project.");
       }
     },
-    [backendUrl, sessionId, toggleMenu, isMobile, selectedProject]
+    [backendUrl, sessionId, selectedProject]
   );
 
   return (

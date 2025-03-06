@@ -1,36 +1,64 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useContext } from "react";
 import { toast } from "sonner";
-
+import { SessionContext } from "../store/SessionProvider"; // ✅ Import SessionContext
 import { getBackEndUrl } from "../util/getbackEndUrl";
 import { useMenu } from "../store/MenuContext";
 import { useIsMobile } from "./useIsMobile";
-import { useSessionCache } from "../store/SessionProvider";
 
 export const useSelectedProject = () => {
-  const { sessionId } = useSessionCache();
+  // ✅ Ensure context is always available
+  const context = useContext(SessionContext);
+  if (!context) {
+    throw new Error("useSelectedProject must be used within a SessionProvider");
+  }
+
+  const {
+    sessionId,
+    selectedProject: contextProject,
+    selectProject: setSessionProject,
+  } = context; // ✅ Extract from context
+
   const backendUrl = getBackEndUrl();
   const { toggleMenu } = useMenu();
   const isMobile = useIsMobile();
 
-  // ✅ Load selected project from localStorage on mount
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState<string | null>(
+    contextProject
+  );
+  const hasUserSelected = useRef(false); // ✅ Track if user manually selected a project
 
+  // ✅ Sync local state with context state
+  useEffect(() => {
+    if (contextProject !== selectedProject) {
+      setSelectedProject(contextProject);
+    }
+  }, [contextProject]);
+
+  // ✅ Load selected project from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedProject = localStorage.getItem("selectedProject");
       if (storedProject) {
         setSelectedProject(storedProject);
+        setSessionProject(storedProject); // ✅ Update SessionContext
       }
     }
-  }, []);
+  }, [setSessionProject]);
 
-  // ✅ Function to select a project and notify the backend
+  // ✅ Function to select a project and update the global session context
   const selectProject = useCallback(
     async (project: string) => {
       if (!project || project === selectedProject) return;
 
       setSelectedProject(project);
+      setSessionProject(project); // ✅ Update context
       localStorage.setItem("selectedProject", project);
+
+      // ✅ Prevent triggering toast if restoring from cache
+      if (!hasUserSelected.current) {
+        console.log("🔄 Restoring cached project:", project);
+        return;
+      }
 
       try {
         if (!sessionId) {
@@ -62,8 +90,15 @@ export const useSelectedProject = () => {
         toast.error("Failed to select project.");
       }
     },
-    [backendUrl, sessionId, selectedProject, isMobile, toggleMenu]
+    [
+      backendUrl,
+      sessionId,
+      selectedProject,
+      setSessionProject,
+      isMobile,
+      toggleMenu,
+    ]
   );
 
-  return { selectedProject, selectProject };
+  return { selectedProject, selectProject, hasUserSelected };
 };
