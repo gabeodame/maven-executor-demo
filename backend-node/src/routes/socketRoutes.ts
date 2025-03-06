@@ -39,7 +39,6 @@ export const setupSocketRoutes = (io: Server) => {
     });
 
     // ✅ Handle Repository Cloning
-    // ✅ Handle Repository Cloning
     socket.on("clone-repo", async (data) => {
       const { repoUrl, branch, projectName, repoPath, pomPath } = data;
       console.log(

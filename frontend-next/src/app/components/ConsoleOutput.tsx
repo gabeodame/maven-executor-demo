@@ -44,12 +44,8 @@ const ConsoleOutput = () => {
       return;
     }
 
-    // ✅ Append logs from both sources
-    setReceivedLogs((prevLogs) => [
-      ...prevLogs,
-      ...cloneLogs.filter((log) => !prevLogs.includes(log)), // Avoid duplicates
-      ...mavenLogs.filter((log) => !prevLogs.includes(log)),
-    ]);
+    // ✅ Replace logs instead of appending to `receivedLogs`
+    setReceivedLogs([...cloneLogs, ...mavenLogs]);
   }, [mavenLogs, sessionId, cloneLogs]);
 
   // ✅ Auto-scroll to the latest log

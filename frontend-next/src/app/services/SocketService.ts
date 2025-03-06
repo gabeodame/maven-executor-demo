@@ -53,6 +53,13 @@ class SocketService {
   public getSocket(): Socket | null {
     return this.socket;
   }
+  public isFirstPipelineRun(): boolean {
+    return this.isFirstPipelineCommand;
+  }
+
+  public resetPipelineState(): void {
+    this.isFirstPipelineCommand = true;
+  }
 
   // ✅ Singleton pattern: Ensures only one instance per session
   public static getInstance(sessionId: string): SocketService {
@@ -82,6 +89,18 @@ class SocketService {
     };
   }
 
+  public clearLogs() {
+    console.log("⚙️ Clearing Maven logs...");
+    this.mavenLogs = [];
+    this.notifySubscribers();
+  }
+
+  public clearCloneLogs() {
+    console.log("⚙️ Clearing Clone logs...");
+    this.cloneLogs = [];
+    this.notifyCloneSubscribers();
+  }
+
   private notifySubscribers() {
     this.subscribers.forEach((callback) =>
       callback([...this.mavenLogs], this.loading)
@@ -95,21 +114,6 @@ class SocketService {
   private setLoading(state: boolean) {
     this.loading = state;
     this.notifySubscribers();
-  }
-
-  private clearLogs() {
-    console.log("⚙️ Clearing Maven logs...");
-    this.mavenLogs = [];
-    if (this.clearCloneLogs.length) {
-      this.clearCloneLogs();
-    }
-    this.notifySubscribers();
-  }
-
-  private clearCloneLogs() {
-    console.log("⚙️ Clearing Clone logs...");
-    this.cloneLogs = [];
-    this.notifyCloneSubscribers();
   }
 
   // ✅ Execute Maven Command
@@ -129,6 +133,7 @@ class SocketService {
       }
     } else {
       this.clearLogs();
+      this.clearCloneLogs();
       this.isFirstPipelineCommand = true;
     }
 

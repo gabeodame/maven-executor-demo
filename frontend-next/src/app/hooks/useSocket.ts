@@ -31,25 +31,19 @@ export const useSocket = () => {
     setSocketService(newSocketService);
     setIsConnected(true);
 
-    // ✅ Subscribe to Maven logs
+    // ✅ Subscribe to Maven logs (Correct log resetting)
     const unsubscribeMaven = newSocketService.subscribe(
       (newLogs, isLoading) => {
-        setMavenLogs((prevLogs) => [
-          ...prevLogs,
-          ...newLogs.filter((log) => !prevLogs.includes(log)),
-        ]);
+        setMavenLogs([...newLogs]); // ✅ Replace logs instead of appending
         setLoading(isLoading);
         if (!isLoading) setCommandCompleted((prev) => !prev);
       }
     );
 
-    // ✅ Subscribe to Clone logs
+    // ✅ Subscribe to Clone logs (Correct log resetting)
     const unsubscribeClone = newSocketService.subscribeCloneLogs((newLogs) => {
       console.log("📡 [Clone Process Log Update]", newLogs);
-      setCloneLogs((prevLogs) => [
-        ...prevLogs,
-        ...newLogs.filter((log) => !prevLogs.includes(log)),
-      ]);
+      setCloneLogs([...newLogs]); // ✅ Replace logs instead of appending
     });
 
     return () => {
@@ -62,7 +56,7 @@ export const useSocket = () => {
       setSocketService(null);
       setIsConnected(false);
     };
-  }, [sessionId]);
+  }, [sessionId]); // ✅ Only re-run when `sessionId` changes
 
   // ✅ Function to run Maven command
   const runMavenCommand = (cmd: string, type?: "pipeline" | "normal") => {
@@ -72,9 +66,26 @@ export const useSocket = () => {
       );
       return;
     }
+
     console.log(
       `▶️ [CLIENT] Sending command: mvn ${cmd} | Session ID: ${sessionId}`
     );
+
+    if (type === "pipeline") {
+      if (socketService.isFirstPipelineRun()) {
+        // ✅ Use the getter
+        setMavenLogs([]); // ✅ Reset logs before first pipeline command
+        socketService.clearLogs();
+        socketService.resetPipelineState(); // ✅ Reset state after first run
+      }
+    } else {
+      setMavenLogs([]); // ✅ Reset logs for fresh start
+      setCloneLogs([]); // ✅ Reset clone logs
+      socketService.clearLogs();
+      socketService.clearCloneLogs();
+      socketService.resetPipelineState(); // ✅ Reset state for normal command
+    }
+
     setCommandCompleted(false);
     socketService.runMavenCommand(cmd, type);
   };
@@ -97,6 +108,7 @@ export const useSocket = () => {
     console.log(
       `▶️ [CLIENT] Triggering repository clone: ${repoUrl} | Branch: ${branch}`
     );
+
     setCloneLogs([]); // ✅ Clear previous logs before starting
 
     return new Promise<void>((resolve, reject) => {

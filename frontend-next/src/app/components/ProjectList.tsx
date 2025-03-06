@@ -29,7 +29,7 @@ function ProjectList() {
         headers: { "x-session-id": sessionId },
       });
 
-      if (!res.ok) throw new Error("Failed to fetch projects");
+      if (!res.ok) toast.error("Failed to fetch projects");
 
       const projectList: string[] = await res.json();
       console.log("📂 Fetched Projects:", projectList);
