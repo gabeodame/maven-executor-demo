@@ -21,7 +21,7 @@ export default function MainContent() {
   }, []);
 
   return (
-    <section className="h-full flex flex-col w-full overflow-hidden lg:min-h-[calc(100vh-290px)]">
+    <section className="h-full flex flex-col w-full overflow-hidden lg:min-h-[calc(100vh-290px)] mt-2">
       {/* ✅ Executor (Always at the Top) */}
       <div className="shrink-0 min-h-[60px]">
         <Executor />
