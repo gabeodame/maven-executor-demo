@@ -129,7 +129,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col w-full`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col w-full overflow-hidden`}
       >
         <ContextProvider>
           {/* ✅ Sticky Header */}
@@ -141,7 +141,7 @@ export default function RootLayout({
           </header>
 
           {/* ✅ Main Layout (Takes Full Remaining Height) */}
-          <main className="w-full flex-grow flex flex-col bg-gray-900 mt-16 sm:mt-20 overflow-hidden">
+          <main className="w-full flex-1 flex bg-gray-900 mt-16 sm:mt-20 overflow-hidden">
             {children}
           </main>
 
