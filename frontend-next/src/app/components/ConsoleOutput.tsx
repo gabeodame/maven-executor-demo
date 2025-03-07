@@ -63,7 +63,7 @@ const ConsoleOutput = () => {
           key={index}
           className={`${getLogColor(
             log
-          )} mb-1 text-sm whitespace-pre-wrap leading-relaxed h-full`}
+          )} mb-1 text-sm whitespace-pre-wrap leading-normal`}
         >
           {log}
         </div>

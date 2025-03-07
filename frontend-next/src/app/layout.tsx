@@ -6,8 +6,10 @@ import ContextProvider from "./store/ContextProvider";
 
 import "./globals.css";
 import Footer from "./components/Footer";
-import MobileMenu from "./components/Menu";
+
 import AdSense from "./components/Adsense";
+import MobileScrollBehavior from "./components/ui/MobileScrollBehavior";
+import MobileMenu from "./components/Menu";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -51,8 +53,15 @@ export const metadata: Metadata = {
       "Effortlessly execute Maven lifecycle commands, view logs, and analyze artifacts in real time.",
     images: ["https://yourwebsite.com/twitter-image.jpg"],
   },
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
+
   robots: "index, follow",
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({
@@ -92,16 +101,11 @@ export default async function RootLayout({
       >
         <ContextProvider>
           <div className="flex h-screen flex-col w-full overflow-hidden">
-            {/* ✅ Sticky Header */}
-            <header
-              className="w-full h-12 sm:h-16 flex justify-between items-center 
-              bg-gray-800 shadow-md text-white px-4 fixed top-0 left-0 z-50"
-            >
-              <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-                📦 Maven Command Executor
-              </h1>
+            {/* ✅ Dynamic Sticky Header */}
+            <div className="flex justify-between items-center w-full">
+              <MobileScrollBehavior />
               <MobileMenu />
-            </header>
+            </div>
 
             {/* ✅ Main Layout (Remove Margin, Use Padding Instead) */}
             <main className="w-full flex-1 flex flex-col bg-gray-900 pt-12 sm:pt-16 overflow-hidden">

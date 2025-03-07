@@ -22,7 +22,7 @@ export default function MainContent() {
   }, []);
 
   return (
-    <section className="h-full flex flex-col w-full overflow-hidden pb-2">
+    <section className="h-full flex flex-col w-full overflow-y-auto pb-2 relative">
       {/* ✅ Make the entire MainContent scrollable as one unit */}
       <div className="flex flex-1 flex-col overflow-y-auto">
         <Executor /> {/* ✅ Executor now scrolls with everything */}

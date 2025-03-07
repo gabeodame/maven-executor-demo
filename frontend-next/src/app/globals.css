@@ -9,9 +9,18 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html,
 body {
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100dvh;
+  height: 100%;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
 :root {
