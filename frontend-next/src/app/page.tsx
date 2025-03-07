@@ -13,9 +13,9 @@ export default function Home() {
 
       {/* ✅ Main Content (Flexible, Scrollable) */}
       <div className="w-full flex-1 flex flex-col overflow-hidden">
-        <div className="w-full min-h-[60px]">
+        {/* <div className="w-full min-h-[60px]">
           <Executor />
-        </div>
+        </div> */}
         <MainContent />
       </div>
 

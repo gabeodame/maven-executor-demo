@@ -23,30 +23,25 @@ export default function MainContent() {
 
   return (
     <section className="h-full flex flex-col w-full overflow-hidden">
-      {/* ✅ Executor (Always at the Top) */}
-      <div className="w-full min-h-[60px]">
-        <Executor />
-      </div>
-
-      {/* ✅ Scrollable Main Section */}
-      <div className="flex flex-1 overflow-y-auto">
-        <div className="w-full bg-gray-800 p-4 rounded-lg shadow-md flex flex-col flex-1 overflow-hidden">
+      {/* ✅ Make the entire MainContent scrollable as one unit */}
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        <Executor /> {/* ✅ Executor now scrolls with everything */}
+        <div className="w-full bg-gray-800 p-4 rounded-lg shadow-md flex flex-col flex-1">
           <h3 className="text-lg font-semibold text-center mb-2">
             Console Output
           </h3>
-          <div className="overflow-auto flex-1 bg-gray-900 p-3 rounded-md">
+          <div className="overflow-hidden flex-1 bg-gray-900 p-3 rounded-md">
             <ConsoleOutput />
           </div>
         </div>
+        {/* ✅ Keep BuildMetrics & Artifacts inside the main scroll container */}
+        {!isDesktop && (
+          <div className="flex flex-col gap-4 mt-4">
+            <BuildMetrics />
+            <Artifacts />
+          </div>
+        )}
       </div>
-
-      {/* ✅ Show BuildMetrics & Artifacts on Mobile/Tablet, Hide on Desktop */}
-      {!isDesktop && (
-        <div className="flex flex-col gap-4 mt-4 overflow-y-auto">
-          <BuildMetrics />
-          <Artifacts />
-        </div>
-      )}
     </section>
   );
 }
