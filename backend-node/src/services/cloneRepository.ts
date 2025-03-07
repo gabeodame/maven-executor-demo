@@ -5,7 +5,7 @@ import { setJavaProjectPath } from "../config/projectPaths";
 import { Server, Socket } from "socket.io";
 
 /**
- * Clones or updates a repository and streams logs via WebSocket
+ * Clones or updates a repository and streams logs via WebSocket.
  */
 export const cloneRepository = async (
   io: Server,
@@ -22,6 +22,9 @@ export const cloneRepository = async (
   const fullRepoPath = path.join(userWorkspace, repoName);
   const gitLockFile = path.join(fullRepoPath, ".git", "index.lock");
 
+  /**
+   * Sends a log message to both console and WebSocket.
+   */
   const sendLog = (msg: string) => {
     console.log(`[Backend] ${msg}`);
     if (socket && typeof socket.emit === "function") {
@@ -33,103 +36,122 @@ export const cloneRepository = async (
 
   sendLog(`🔍 Checking workspace for session: ${sessionId}`);
 
-  if (!fs.existsSync(userWorkspace)) {
-    fs.mkdirSync(userWorkspace, { recursive: true });
-    sendLog(`✅ Created workspace: ${userWorkspace}`);
-  }
-
-  if (fs.existsSync(fullRepoPath)) {
-    sendLog(`⚠️ Repository already exists at: ${fullRepoPath}`);
-
-    if (fs.existsSync(gitLockFile)) {
-      sendLog(`⚠️ Stale Git lock file detected. Removing.`);
-      fs.unlinkSync(gitLockFile);
+  try {
+    // ✅ Ensure workspace directory exists
+    if (!fs.existsSync(userWorkspace)) {
+      fs.mkdirSync(userWorkspace, { recursive: true });
+      sendLog(`✅ Created workspace: ${userWorkspace}`);
     }
 
-    try {
-      sendLog(`🔄 Fetching latest changes from branch: ${branch}`);
-      sendLog(
-        `⚙️ Running: git -C ${fullRepoPath} remote set-url origin ${repoUrl}`
-      );
-      execSync(`git -C ${fullRepoPath} remote set-url origin ${repoUrl}`, {
-        stdio: "inherit",
-      });
+    // ✅ Apply correct permissions (but DO NOT log it for security reasons)
+    execSync(`chown -R $(whoami) ${userWorkspace}`, { stdio: "ignore" });
 
-      sendLog(
-        `⚙️ Running: git -C ${fullRepoPath} fetch --depth=1 origin ${branch}`
-      );
-      execSync(`git -C ${fullRepoPath} fetch --depth=1 origin ${branch}`, {
-        stdio: "inherit",
-      });
+    if (fs.existsSync(fullRepoPath)) {
+      sendLog(`⚠️ Repository already exists at: ${fullRepoPath}`);
 
-      const remoteBranches = execSync(`git -C ${fullRepoPath} branch -r`, {
-        encoding: "utf-8",
-      }).trim();
-      if (!remoteBranches.includes(`origin/${branch}`)) {
-        throw new Error(`❌ ERROR: The branch '${branch}' does not exist.`);
+      if (fs.existsSync(gitLockFile)) {
+        sendLog(`⚠️ Stale Git lock file detected. Removing.`);
+        fs.unlinkSync(gitLockFile);
       }
 
-      sendLog(
-        `⚙️ Running: git -C ${fullRepoPath} checkout ${branch} || git -C ${fullRepoPath} checkout -b ${branch} origin/${branch}`
-      );
-      execSync(
-        `git -C ${fullRepoPath} checkout ${branch} || git -C ${fullRepoPath} checkout -b ${branch} origin/${branch}`,
-        { stdio: "inherit" }
-      );
+      try {
+        sendLog(`🔄 Fetching latest changes from branch: ${branch}`);
+        sendLog(
+          `⚙️ Running: git -C ${fullRepoPath} remote set-url origin ${repoUrl}`
+        );
+        execSync(`git -C ${fullRepoPath} remote set-url origin ${repoUrl}`, {
+          stdio: "pipe",
+        });
 
-      sendLog(
-        `⚙️ Running: git -C ${fullRepoPath} pull origin ${branch} --ff-only`
-      );
-      execSync(`git -C ${fullRepoPath} pull origin ${branch} --ff-only`, {
-        stdio: "inherit",
-      });
+        sendLog(`⚙️ Running: git -C ${fullRepoPath} fetch --all --prune`);
+        execSync(`git -C ${fullRepoPath} fetch --all --prune`, {
+          stdio: "pipe",
+        });
 
-      sendLog(`✅ Repository updated successfully.`);
-    } catch (error) {
-      if (error instanceof Error) {
-        sendLog(`❌ ERROR: Failed to update repository: ${error.message}`);
+        // ✅ Handle Untracked Files Before Checkout
+        sendLog(`🛠️ Checking for untracked files before checkout...`);
+        const statusOutput = execSync(
+          `git -C ${fullRepoPath} status --porcelain`,
+          { encoding: "utf-8" }
+        ).trim();
+        if (statusOutput.length > 0) {
+          sendLog(
+            `⚠️ Untracked changes detected! Running 'git reset --hard && git clean -fd'.`
+          );
+          execSync(`git -C ${fullRepoPath} reset --hard`, { stdio: "pipe" });
+          execSync(`git -C ${fullRepoPath} clean -fd`, { stdio: "pipe" });
+        }
+
+        sendLog(`⚙️ Ensuring local tracking branch exists for '${branch}'`);
+        execSync(
+          `git -C ${fullRepoPath} checkout -B ${branch} origin/${branch}`,
+          { stdio: "pipe" }
+        );
+
+        sendLog(
+          `⚙️ Running: git -C ${fullRepoPath} pull origin ${branch} --ff-only`
+        );
+        execSync(`git -C ${fullRepoPath} pull origin ${branch} --ff-only`, {
+          stdio: "pipe",
+        });
+
+        sendLog(`✅ Repository updated successfully.`);
+      } catch (error) {
+        sendLog(
+          `❌ ERROR: Failed to update repository: ${
+            error instanceof Error ? error.message : error
+          }`
+        );
+        sendLog(`🗑 Removing corrupted repo and retrying clone...`);
+        fs.rmSync(fullRepoPath, { recursive: true, force: true });
+
+        sendLog(`🚀 Cloning fresh repository: ${repoUrl} (branch: ${branch})`);
+        execSync(
+          `git clone --branch ${branch} --depth=1 ${repoUrl} ${fullRepoPath}`,
+          { stdio: "pipe" }
+        );
       }
-      sendLog("🗑 Removing corrupted repo and retrying clone...");
-      fs.rmSync(fullRepoPath, { recursive: true, force: true });
-
-      sendLog(`🚀 Cloning fresh repository: ${repoUrl} (branch: ${branch})`);
+    } else {
+      sendLog(`🚀 Cloning repository: ${repoUrl} (branch: ${branch})`);
+      sendLog(
+        `⚙️ Running: git clone --branch ${branch} --depth=1 ${repoUrl} ${fullRepoPath}`
+      );
       execSync(
         `git clone --branch ${branch} --depth=1 ${repoUrl} ${fullRepoPath}`,
-        { stdio: "inherit" }
+        { stdio: "pipe" }
       );
     }
-  } else {
-    sendLog(`🚀 Cloning repository: ${repoUrl} (branch: ${branch})`);
+
+    // ✅ Ensure repoPath exists
+    const projectDir = repoPath
+      ? path.resolve(fullRepoPath, repoPath)
+      : fullRepoPath;
+    if (!fs.existsSync(projectDir)) {
+      sendLog(`❌ ERROR: Specified repoPath does not exist: ${projectDir}`);
+      throw new Error(
+        "Invalid repoPath: The specified directory does not exist."
+      );
+    }
+
+    // ✅ Ensure pom.xml exists
+    const pomFilePath = pomPath
+      ? path.join(fullRepoPath, pomPath)
+      : path.join(projectDir, "pom.xml");
+    if (!fs.existsSync(pomFilePath)) {
+      sendLog(`❌ ERROR: No pom.xml found at ${pomFilePath}.`);
+      throw new Error("Invalid project: A valid pom.xml file is required.");
+    }
+
+    setJavaProjectPath(sessionId, projectDir);
+    sendLog(`✅ Repository cloned/updated and set for session: ${sessionId}`);
+
+    return projectDir;
+  } catch (error) {
     sendLog(
-      `⚙️ Running: git clone --branch ${branch} --depth=1 ${repoUrl} ${fullRepoPath}`
+      `❌ ERROR: Clone process failed: ${
+        error instanceof Error ? error.message : error
+      }`
     );
-    execSync(
-      `git clone --branch ${branch} --depth=1 ${repoUrl} ${fullRepoPath}`,
-      { stdio: "inherit" }
-    );
+    throw error; // Ensure the error propagates properly
   }
-
-  const projectDir = repoPath
-    ? path.resolve(fullRepoPath, repoPath)
-    : fullRepoPath;
-
-  if (!fs.existsSync(projectDir)) {
-    sendLog(`❌ ERROR: Specified repoPath does not exist: ${projectDir}`);
-    throw new Error(
-      "Invalid repoPath: The specified directory does not exist."
-    );
-  }
-
-  const pomFilePath = pomPath
-    ? path.join(fullRepoPath, pomPath)
-    : path.join(projectDir, "pom.xml");
-  if (!fs.existsSync(pomFilePath)) {
-    sendLog(`❌ ERROR: No pom.xml found at ${pomFilePath}.`);
-    throw new Error("Invalid project: A valid pom.xml file is required.");
-  }
-
-  setJavaProjectPath(sessionId, projectDir);
-  sendLog(`✅ Repository cloned/updated and set for session: ${sessionId}`);
-
-  return projectDir;
 };

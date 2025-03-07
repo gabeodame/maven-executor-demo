@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
-import Footer from "./components/Footer";
-import MobileMenu from "./components/Menu";
+// import Footer from "./components/Footer";
+// import MobileMenu from "./components/Menu";
 import ContextProvider from "./store/ContextProvider";
 
 import "./globals.css";
+import ClientWrapper from "./components/ClientWrapper";
+import { headers } from "next/headers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -61,11 +63,13 @@ export const metadata: Metadata = {
   viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const headerList = await headers();
+  const nonce = headerList.get("x-nonce") || undefined;
   return (
     <html lang="en">
       <head>
@@ -126,27 +130,14 @@ export default function RootLayout({
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2067270214726984"
           crossOrigin="anonymous"
+          nonce={nonce}
         />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col w-full overflow-hidden`}
       >
         <ContextProvider>
-          {/* ✅ Sticky Header */}
-          <header className="w-full h-16 sm:h-20 flex justify-between items-center bg-gray-800 shadow-md text-white px-4 fixed top-0 left-0 z-50">
-            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-              📦 Maven Command Executor
-            </h1>
-            <MobileMenu />
-          </header>
-
-          {/* ✅ Main Layout (Takes Full Remaining Height) */}
-          <main className="w-full flex-1 flex bg-gray-900 mt-16 sm:mt-20 overflow-hidden">
-            {children}
-          </main>
-
-          {/* ✅ Footer (Fixed at Bottom) */}
-          <Footer />
+          <ClientWrapper>{children}</ClientWrapper>
         </ContextProvider>
       </body>
     </html>
