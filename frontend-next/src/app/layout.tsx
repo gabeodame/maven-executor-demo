@@ -72,7 +72,7 @@ export default async function RootLayout({
         <meta name="twitter:card" content="summary_large_image" />
 
         {/* ✅ Load Google Tag Manager (Async) */}
-        <AdSense pId="" />
+        <AdSense pId="ca-pub-2067270214726984" />
         <Script
           id="google-analytics"
           strategy="afterInteractive"
