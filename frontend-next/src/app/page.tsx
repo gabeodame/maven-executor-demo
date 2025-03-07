@@ -1,7 +1,6 @@
 import SideBarLeft from "./components/SideBarLeft";
 import MainContent from "./components/MainContent";
 import RightSideBar from "./components/RightSideBar";
-import Executor from "./components/Executor";
 
 export default function Home() {
   return (
