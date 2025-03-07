@@ -55,7 +55,7 @@ const ConsoleOutput = () => {
 
   return (
     <div
-      className="flex flex-col flex-1 overflow-auto bg-gray-800 text-white p-3 font-mono rounded-md border border-gray-700"
+      className="flex h-full flex-col flex-1 overflow-auto bg-gray-800 text-white p-3 font-mono rounded-md border border-gray-700"
       style={{ minHeight: "30vh", maxHeight: "calc(100vh - 290px)" }}
     >
       {receivedLogs.map((log, index) => (
@@ -63,7 +63,7 @@ const ConsoleOutput = () => {
           key={index}
           className={`${getLogColor(
             log
-          )} mb-1 text-sm whitespace-pre-wrap leading-relaxed`}
+          )} mb-1 text-sm whitespace-pre-wrap leading-relaxed h-full`}
         >
           {log}
         </div>

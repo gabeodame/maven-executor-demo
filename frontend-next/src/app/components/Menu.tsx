@@ -13,7 +13,7 @@ const MobileMenu = () => {
   const { isOpen, toggleMenu } = useMenu();
 
   return (
-    <>
+    <div className="z-99">
       {/* Prevent background scroll when menu is open */}
       {isOpen && <style>{`body { overflow: hidden; }`}</style>}
 
@@ -52,7 +52,7 @@ const MobileMenu = () => {
           >
             {/* Close Button */}
             <button
-              className="text-white text-xl self-end"
+              className="text-white text-xl self-end z-5"
               onClick={toggleMenu}
               aria-label="Close Menu"
             >
@@ -74,7 +74,7 @@ const MobileMenu = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </div>
   );
 };
 

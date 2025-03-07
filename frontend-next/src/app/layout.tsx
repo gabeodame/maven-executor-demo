@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
-// import Footer from "./components/Footer";
-// import MobileMenu from "./components/Menu";
 import ContextProvider from "./store/ContextProvider";
+// import ClientWrapper from "./components/ClientWrapper";
 
 import "./globals.css";
-import ClientWrapper from "./components/ClientWrapper";
-import { headers } from "next/headers";
+import Footer from "./components/Footer";
+import MobileMenu from "./components/Menu";
+import AdSense from "./components/Adsense";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,32 +24,24 @@ export const metadata: Metadata = {
   title: "Maven Command Executor | Build & Deploy Maven Projects",
   description:
     "Execute Maven lifecycle commands, track build logs, and analyze artifacts in real time. Ideal for Java developers and DevOps automation.",
-  keywords: [
-    "Maven",
-    "Java Build",
-    "CI/CD",
-    "DevOps",
-    "Continuous Integration",
-    "Java Development",
-    "Build Automation",
-    "Software Development",
-  ].join(", "),
+  keywords:
+    "Maven, Java Build, CI/CD, DevOps, Continuous Integration, Java Development, Build Automation, Software Development",
   authors: [{ name: "Your Name or Brand", url: "https://yourwebsite.com" }],
   openGraph: {
     title: "Maven Command Executor",
     description:
       "Run Maven lifecycle commands with ease. Get detailed build logs and artifact analysis in a streamlined UI.",
-    type: "website",
     url: "https://yourwebsite.com",
     siteName: "Maven Command Executor",
     images: [
       {
-        url: "https://yourwebsite.com/og-image.jpg", // Replace with actual image
+        url: "https://yourwebsite.com/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "Maven Command Executor UI Screenshot",
       },
     ],
+    type: "website",
   },
   twitter: {
     card: "summary_large_image",
@@ -57,87 +49,68 @@ export const metadata: Metadata = {
     title: "Maven Command Executor",
     description:
       "Effortlessly execute Maven lifecycle commands, view logs, and analyze artifacts in real time.",
-    images: ["https://yourwebsite.com/twitter-image.jpg"], // Replace with actual image
+    images: ["https://yourwebsite.com/twitter-image.jpg"],
   },
-  robots: "index, follow",
   viewport: "width=device-width, initial-scale=1, maximum-scale=1",
+  robots: "index, follow",
 };
 
 export default async function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  const headerList = await headers();
-  const nonce = headerList.get("x-nonce") || undefined;
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <head>
-        {/* ✅ Dynamic Metadata for SEO & Social Sharing */}
+        {/* ✅ Dynamic Metadata for SEO */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://yourwebsite.com" />
-        <meta
-          property="og:title"
-          content="Maven Command Executor | Automate Maven Builds"
-        />
-        <meta
-          property="og:description"
-          content="Run Maven lifecycle commands, track logs, and analyze artifacts in real time."
-        />
         <meta
           property="og:image"
           content="https://yourwebsite.com/og-image.jpg"
         />
 
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Maven Command Executor" />
-        <meta
-          name="twitter:description"
-          content="Run Maven lifecycle commands with ease."
-        />
-        <meta
-          name="twitter:image"
-          content="https://yourwebsite.com/twitter-image.jpg"
-        />
-        <meta name="google-adsense-account" content="ca-pub-2067270214726984" />
 
-        {/* ✅ Structured Data for SEO (JSON-LD Schema) */}
+        {/* ✅ Load Google Tag Manager (Async) */}
+        <AdSense pId="" />
         <Script
-          id="structured-data"
-          type="application/ld+json"
+          id="google-analytics"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "SoftwareApplication",
-              name: "Maven Command Executor",
-              description:
-                "Run Maven lifecycle commands with ease, view logs, and analyze artifacts.",
-              applicationCategory: "DeveloperTool",
-              operatingSystem: "All",
-              offers: {
-                "@type": "Offer",
-                price: "0",
-                priceCurrency: "USD",
-              },
-              url: "https://yourwebsite.com",
-              image: "https://yourwebsite.com/og-image.jpg",
-            }),
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'ca-pub-2067270214726984');
+            `,
           }}
         />
-
-        {/* ✅ Load Ads and Tracking Asynchronously for Performance */}
-        <Script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2067270214726984"
-          crossOrigin="anonymous"
-          nonce={nonce}
-        />
       </head>
+
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col w-full overflow-hidden`}
       >
         <ContextProvider>
-          <ClientWrapper>{children}</ClientWrapper>
+          <div className="flex h-screen flex-col w-full overflow-hidden">
+            {/* ✅ Sticky Header */}
+            <header
+              className="w-full h-12 sm:h-16 flex justify-between items-center 
+              bg-gray-800 shadow-md text-white px-4 fixed top-0 left-0 z-50"
+            >
+              <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+                📦 Maven Command Executor
+              </h1>
+              <MobileMenu />
+            </header>
+
+            {/* ✅ Main Layout (Remove Margin, Use Padding Instead) */}
+            <main className="w-full flex-1 flex flex-col bg-gray-900 pt-12 sm:pt-16 overflow-hidden">
+              {children}
+            </main>
+
+            {/* ✅ Footer */}
+            <Footer />
+          </div>
         </ContextProvider>
       </body>
     </html>
