@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useSocket } from "../hooks/useSocket";
-import Accordion from "./ui/Accordion";
-import { useMenu } from "../store/MenuContext";
-import { useIsMobile } from "../hooks/useIsMobile";
+import { useSocket } from "../../hooks/useSocket";
+import Accordion from "../ui/Accordion";
+import { useMenu } from "../../store/react-context/MenuContext";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 const executionCommands = [
   "install",

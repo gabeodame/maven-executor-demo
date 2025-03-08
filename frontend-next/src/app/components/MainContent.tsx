@@ -5,7 +5,7 @@ import ConsoleOutput from "./ConsoleOutput";
 // import Executor from "./Executor";
 import Artifacts from "./Artifacts";
 import { useEffect, useState } from "react";
-import Executor from "./Executor";
+import Executor from "./maven-executors/Executor";
 
 export default function MainContent() {
   const [isDesktop, setIsDesktop] = useState(false);

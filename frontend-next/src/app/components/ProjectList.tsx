@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import Accordion from "./ui/Accordion";
 import ProjectItem from "./ProjectItem";
-import { useSessionCache } from "../store/SessionProvider";
+import { useSessionCache } from "../store/react-context/SessionProvider";
 import { getBackEndUrl } from "../util/getbackEndUrl";
 import { useSelectedProject } from "../hooks/useSelectedProject";
 import { toast } from "sonner";

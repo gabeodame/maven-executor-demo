@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { useSocket } from "../hooks/useSocket";
-import { useSessionCache } from "../store/SessionProvider";
+import { useEffect, useRef } from "react";
+import { useAppSelector, useAppDispatch } from "@/app/store/hooks";
+import { useSessionCache } from "../store/react-context/SessionProvider";
+import { addMavenLog } from "../store/redux-toolkit/slices/logSlice";
+import {
+  guestUserWelcome,
+  gitHubUserWelcome,
+  initialLogs,
+} from "../util/constants/initialLogs";
 
 const getLogColor = (log: string) => {
   if (
@@ -29,36 +35,37 @@ const getLogColor = (log: string) => {
 };
 
 const ConsoleOutput = () => {
-  const [receivedLogs, setReceivedLogs] = useState<string[]>([]);
   const { sessionId } = useSessionCache();
-  const { cloneLogs, mavenLogs } = useSocket();
   const logsEndRef = useRef<HTMLDivElement>(null);
 
+  const { isGitHubUser } = useSessionCache();
+  const { cloneLogs, mavenLogs } = useAppSelector((state) => state.logs);
+  const dispatch = useAppDispatch();
+
+  // ✅ Check session & reset logs if needed
+
   useEffect(() => {
+    let welcomeMessage;
     if (!sessionId) {
-      setReceivedLogs([
-        "🚀 Welcome to Maven Command Executor!",
-        "🔑 Please log in to execute commands:\n   - Sign in with GitHub: Type 'login github'\n   - Continue as Guest: Type 'login guest'",
-        "⚡ Once logged in, select Maven commands to execute.",
-      ]);
-      return;
+      welcomeMessage = initialLogs;
     }
+    if (sessionId) {
+      welcomeMessage = isGitHubUser ? gitHubUserWelcome : guestUserWelcome;
+    }
+    welcomeMessage?.forEach((log) => dispatch(addMavenLog(log)));
+  }, [isGitHubUser, dispatch, sessionId]);
 
-    // ✅ Replace logs instead of appending to `receivedLogs`
-    setReceivedLogs([...cloneLogs, ...mavenLogs]);
-  }, [mavenLogs, sessionId, cloneLogs]);
-
-  // ✅ Auto-scroll to the latest log
+  // ✅ Auto-scroll when logs update
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [receivedLogs]);
+  }, [mavenLogs, cloneLogs]);
 
   return (
     <div
       className="flex h-full flex-col flex-1 overflow-auto bg-gray-800 text-white p-3 font-mono rounded-md border border-gray-700"
       style={{ minHeight: "30vh", maxHeight: "calc(100vh - 290px)" }}
     >
-      {receivedLogs.map((log, index) => (
+      {[...mavenLogs, ...cloneLogs].map((log, index) => (
         <div
           key={index}
           className={`${getLogColor(

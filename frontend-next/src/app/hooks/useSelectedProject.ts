@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useContext } from "react";
 import { toast } from "sonner";
-import { SessionContext } from "../store/SessionProvider"; // ✅ Import SessionContext
+import { SessionContext } from "../store/react-context/SessionProvider"; // ✅ Import SessionContext
 import { getBackEndUrl } from "../util/getbackEndUrl";
-import { useMenu } from "../store/MenuContext";
+import { useMenu } from "../store/react-context/MenuContext";
 import { useIsMobile } from "./useIsMobile";
 
 export const useSelectedProject = () => {
@@ -32,7 +32,7 @@ export const useSelectedProject = () => {
     if (contextProject !== selectedProject) {
       setSelectedProject(contextProject);
     }
-  }, [contextProject]);
+  }, [contextProject, selectedProject]);
 
   // ✅ Load selected project from localStorage on mount
   useEffect(() => {

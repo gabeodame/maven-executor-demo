@@ -1,9 +1,10 @@
 import React from "react";
-import MavenDebugTools from "./MavenDebugTools";
-import MavenDependencyTools from "./MavenDependencyTools";
-import MavenExecutionTools from "./MavenExecutionTools";
-import MavenPipeline from "./MavenPipeline";
+
 import UserAccount from "./UserAccount";
+import MavenDebugTools from "./maven-executors/MavenDebugTools";
+import MavenDependencyTools from "./maven-executors/MavenDependencyTools";
+import MavenExecutionTools from "./maven-executors/MavenExecutionTools";
+import MavenPipeline from "./maven-executors/MavenPipeline";
 
 async function SideBarLeft() {
   return (

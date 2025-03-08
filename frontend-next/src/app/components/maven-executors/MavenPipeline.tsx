@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useSocket } from "../hooks/useSocket";
-import Accordion from "./ui/Accordion";
-import { useMenu } from "../store/MenuContext";
-import { useIsMobile } from "../hooks/useIsMobile"; // ✅ Import the new hook
+import { useSocket } from "../../hooks/useSocket";
+import Accordion from "../ui/Accordion";
+import { useMenu } from "../../store/react-context/MenuContext";
+import { useIsMobile } from "../../hooks/useIsMobile"; // ✅ Import the new hook
 
 const pipelines = [
   { name: "Full Build", commands: ["clean", "compile", "package", "install"] },

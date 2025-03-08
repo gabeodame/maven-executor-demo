@@ -5,15 +5,17 @@ import Login from "./Login";
 import RepoList from "./RepoList";
 import { useSession, signOut } from "next-auth/react";
 import ProjectList from "./ProjectList";
-import { useMenu } from "../store/MenuContext";
-import { useSessionCache } from "../store/SessionProvider";
+import { useMenu } from "../store/react-context/MenuContext";
+import { useSessionCache } from "../store/react-context/SessionProvider";
+import { useAppDispatch } from "../store/hooks";
+import { addMavenLog } from "../store/redux-toolkit/slices/logSlice";
 
 function UserAccount() {
   const { data: session, status } = useSession();
-  const { sessionId: cachedSessionId } = useSessionCache();
-  const [isGithubUser, setIsGithubUser] = useState(false);
+  const { sessionId: cachedSessionId, isGitHubUser } = useSessionCache();
   const [isClient, setIsClient] = useState(false); // ✅ Prevent SSR mismatch
   const { isOpen, toggleMenu } = useMenu(); // ✅ Track menu open state
+  const dispatch = useAppDispatch();
 
   const sessionId = session?.user?.id || cachedSessionId;
 
@@ -21,17 +23,10 @@ function UserAccount() {
     setIsClient(true);
   }, []);
 
-  useEffect(() => {
-    if (!sessionId || typeof sessionId !== "string") {
-      setIsGithubUser(false);
-      return;
-    }
-    setIsGithubUser(!sessionId.startsWith("guest-"));
-  }, [sessionId]);
-
   const handleSignOut = async () => {
+    dispatch(addMavenLog(""));
     localStorage.removeItem("sessionId");
-    if (isGithubUser) {
+    if (isGitHubUser) {
       await signOut({ callbackUrl: "/" });
     } else {
       window.location.reload();

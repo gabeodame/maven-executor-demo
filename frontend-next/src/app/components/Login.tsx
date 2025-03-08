@@ -2,16 +2,19 @@
 import { FaGithub } from "react-icons/fa";
 import { signIn } from "next-auth/react";
 import { LuUserRoundMinus } from "react-icons/lu";
-import { useSessionCache } from "../store/SessionProvider";
-// import { getBackEndUrl } from "../util/getbackEndUrl";
+import { useSessionCache } from "../store/react-context/SessionProvider";
+// import { resetLogsForGuest } from "../store/redux-toolkit/slices/logSlice";
+// import { useAppDispatch } from "../store/hooks";
 
 export default function Login() {
   const { fetchGuestSession } = useSessionCache();
+  // const dispatch = useAppDispatch();
 
   const handleSignIn = async (provider?: "github") => {
     if (provider === "github") {
       console.log("🔹 Signing in with GitHub...");
       await signIn("github");
+      // dispatch(resetLogsForGuest());
       return;
     }
 

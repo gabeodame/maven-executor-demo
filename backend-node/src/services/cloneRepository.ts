@@ -7,6 +7,7 @@ import { Server, Socket } from "socket.io";
 /**
  * Clones or updates a repository and streams logs via WebSocket.
  */
+
 export const cloneRepository = async (
   io: Server,
   socket: Socket,
@@ -29,8 +30,6 @@ export const cloneRepository = async (
     console.log(`[Backend] ${msg}`);
     if (socket && typeof socket.emit === "function") {
       socket.emit("clone-log", msg);
-    } else {
-      console.error("❌ ERROR: Invalid socket reference, cannot emit logs.");
     }
   };
 
@@ -43,7 +42,7 @@ export const cloneRepository = async (
       sendLog(`✅ Created workspace: ${userWorkspace}`);
     }
 
-    // ✅ Apply correct permissions (but DO NOT log it for security reasons)
+    // ✅ Apply correct permissions (DO NOT log for security reasons)
     execSync(`chown -R $(whoami) ${userWorkspace}`, { stdio: "ignore" });
 
     if (fs.existsSync(fullRepoPath)) {
@@ -56,14 +55,9 @@ export const cloneRepository = async (
 
       try {
         sendLog(`🔄 Fetching latest changes from branch: ${branch}`);
-        sendLog(
-          `⚙️ Running: git -C ${fullRepoPath} remote set-url origin ${repoUrl}`
-        );
         execSync(`git -C ${fullRepoPath} remote set-url origin ${repoUrl}`, {
           stdio: "pipe",
         });
-
-        sendLog(`⚙️ Running: git -C ${fullRepoPath} fetch --all --prune`);
         execSync(`git -C ${fullRepoPath} fetch --all --prune`, {
           stdio: "pipe",
         });
@@ -75,34 +69,36 @@ export const cloneRepository = async (
           { encoding: "utf-8" }
         ).trim();
         if (statusOutput.length > 0) {
-          sendLog(
-            `⚠️ Untracked changes detected! Running 'git reset --hard && git clean -fd'.`
-          );
+          sendLog(`⚠️ Untracked changes detected! Cleaning workspace.`);
           execSync(`git -C ${fullRepoPath} reset --hard`, { stdio: "pipe" });
           execSync(`git -C ${fullRepoPath} clean -fd`, { stdio: "pipe" });
         }
 
-        sendLog(`⚙️ Ensuring local tracking branch exists for '${branch}'`);
+        // ✅ Ensure branch exists before checkout
+        const branches = execSync(`git -C ${fullRepoPath} branch -r`, {
+          encoding: "utf-8",
+        });
+        if (!branches.includes(`origin/${branch}`)) {
+          throw new Error(`Branch '${branch}' does not exist on remote.`);
+        }
+
+        sendLog(`⚙️ Checking out branch '${branch}'`);
         execSync(
           `git -C ${fullRepoPath} checkout -B ${branch} origin/${branch}`,
           { stdio: "pipe" }
         );
 
-        sendLog(
-          `⚙️ Running: git -C ${fullRepoPath} pull origin ${branch} --ff-only`
-        );
+        sendLog(`⚙️ Pulling latest changes`);
         execSync(`git -C ${fullRepoPath} pull origin ${branch} --ff-only`, {
           stdio: "pipe",
         });
 
         sendLog(`✅ Repository updated successfully.`);
       } catch (error) {
-        sendLog(
-          `❌ ERROR: Failed to update repository: ${
-            error instanceof Error ? error.message : error
-          }`
-        );
-        sendLog(`🗑 Removing corrupted repo and retrying clone...`);
+        const receivedError = error instanceof Error ? error.message : error;
+        sendLog(`❌ ERROR: Failed to update repository: ${receivedError}`);
+        sendLog(`🗑 Removing corrupted repo and retrying fresh clone...`);
+
         fs.rmSync(fullRepoPath, { recursive: true, force: true });
 
         sendLog(`🚀 Cloning fresh repository: ${repoUrl} (branch: ${branch})`);
@@ -113,9 +109,6 @@ export const cloneRepository = async (
       }
     } else {
       sendLog(`🚀 Cloning repository: ${repoUrl} (branch: ${branch})`);
-      sendLog(
-        `⚙️ Running: git clone --branch ${branch} --depth=1 ${repoUrl} ${fullRepoPath}`
-      );
       execSync(
         `git clone --branch ${branch} --depth=1 ${repoUrl} ${fullRepoPath}`,
         { stdio: "pipe" }
@@ -128,6 +121,10 @@ export const cloneRepository = async (
       : fullRepoPath;
     if (!fs.existsSync(projectDir)) {
       sendLog(`❌ ERROR: Specified repoPath does not exist: ${projectDir}`);
+      io.to(sessionId).emit("repo-clone-status", {
+        success: false,
+        error: "Invalid repoPath.",
+      });
       throw new Error(
         "Invalid repoPath: The specified directory does not exist."
       );
@@ -139,19 +136,34 @@ export const cloneRepository = async (
       : path.join(projectDir, "pom.xml");
     if (!fs.existsSync(pomFilePath)) {
       sendLog(`❌ ERROR: No pom.xml found at ${pomFilePath}.`);
+      io.to(sessionId).emit("repo-clone-status", {
+        success: false,
+        error: "pom.xml not found.",
+      });
       throw new Error("Invalid project: A valid pom.xml file is required.");
     }
 
     setJavaProjectPath(sessionId, projectDir);
     sendLog(`✅ Repository cloned/updated and set for session: ${sessionId}`);
 
+    // ✅ Emit WebSocket event for success
+    io.to(sessionId).emit("repo-clone-status", {
+      success: true,
+      repoPath: fullRepoPath,
+    });
+
     return projectDir;
   } catch (error) {
-    sendLog(
-      `❌ ERROR: Clone process failed: ${
-        error instanceof Error ? error.message : error
-      }`
-    );
-    throw error; // Ensure the error propagates properly
+    const recivedError = error instanceof Error ? error.message : error;
+
+    sendLog(`❌ ERROR: Clone process failed: ${recivedError}`);
+
+    // ✅ Emit WebSocket event for failure
+    io.to(sessionId).emit("repo-clone-status", {
+      success: false,
+      error: recivedError,
+    });
+
+    throw error;
   }
 };

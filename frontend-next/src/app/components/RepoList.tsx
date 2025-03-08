@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Toaster, toast } from "sonner";
 import Accordion from "./ui/Accordion";
-import { useSessionCache } from "../store/SessionProvider";
+import { useSessionCache } from "../store/react-context/SessionProvider";
 import CloneRepoForm from "./forms/CloneRepoForm";
 import { useSocket } from "../hooks/useSocket";
 

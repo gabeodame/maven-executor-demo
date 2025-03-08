@@ -1,6 +1,17 @@
 import { io, Socket } from "socket.io-client";
 import { getBackEndUrl } from "../util/getbackEndUrl";
 
+import { store } from "../store/redux-toolkit/store";
+
+import {
+  cloneFailure,
+  cloneSuccess,
+} from "../store/redux-toolkit/slices/repoCloneStatusSlice";
+import {
+  addCloneLog,
+  addMavenLog,
+} from "../store/redux-toolkit/slices/logSlice";
+
 class SocketService {
   private static instance: SocketService | null = null;
   private socket: Socket;
@@ -33,6 +44,7 @@ class SocketService {
     this.socket.on("maven-output", (data: string) => {
       console.log(`📡 [WebSocket] Maven Output: ${data}`);
       this.mavenLogs.push(data);
+      store.dispatch(addMavenLog(data));
 
       if (data.includes("BUILD SUCCESS") || data.includes("BUILD FAILURE")) {
         this.setLoading(false);
@@ -45,9 +57,35 @@ class SocketService {
     this.socket.on("clone-log", (data: string) => {
       const formattedLog = `[CLONE] ${new Date().toLocaleTimeString()} ➜ ${data}`;
       console.log(`📡 [WebSocket] Clone Log: ${formattedLog}`);
-      this.cloneLogs.push(formattedLog);
+      // this.cloneLogs.push(formattedLog);
+      store.dispatch(addCloneLog(formattedLog));
+      if (data.includes("✅ Repository cloned successfully")) {
+        store.dispatch(cloneSuccess());
+      } else if (data.includes("❌ ERROR")) {
+        store.dispatch(cloneFailure(data));
+      }
       this.notifyCloneSubscribers();
     });
+
+    // ✅ Listen for Clone Status updates
+    this.socket.on(
+      "repo-clone-status",
+      (data: { success: boolean; repoPath?: string; error?: string }) => {
+        if (data.success) {
+          console.log(
+            `🎉 Clone completed successfully. Repo Path: ${data.repoPath}`
+          );
+          this.cloneLogs.push(
+            `✅ Clone completed successfully: ${data.repoPath}`
+          );
+        } else {
+          console.error(`❌ Clone failed: ${data.error}`);
+          this.cloneLogs.push(`❌ Clone failed: ${data.error}`);
+        }
+
+        this.notifyCloneSubscribers();
+      }
+    );
   }
 
   public getSocket(): Socket | null {
@@ -140,6 +178,28 @@ class SocketService {
     this.mavenLogs.push(`▶️ [CLIENT] Sending command: mvn ${command}`);
     this.setLoading(true);
     this.socket.emit("run-maven-command", command);
+  }
+
+  public subscribeCloneStatus(
+    callback: (status: {
+      success: boolean;
+      repoPath?: string;
+      error?: string;
+    }) => void
+  ): () => void {
+    const handler = (data: {
+      success: boolean;
+      repoPath?: string;
+      error?: string;
+    }) => {
+      callback(data);
+    };
+
+    this.socket.on("repo-clone-status", handler);
+
+    return () => {
+      this.socket.off("repo-clone-status", handler);
+    };
   }
 
   // ✅ Clone Repository via WebSocket (Jenkins-style logs)

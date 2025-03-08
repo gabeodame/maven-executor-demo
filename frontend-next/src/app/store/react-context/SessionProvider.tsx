@@ -9,13 +9,14 @@ import {
 } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
-import { getBackEndUrl } from "../util/getbackEndUrl";
+import { getBackEndUrl } from "../../util/getbackEndUrl";
 
 const SESSION_STORAGE_KEY = "sessionId";
 const PROJECT_STORAGE_KEY = "selectedProject";
 
 interface SessionContextType {
   sessionId: string | null;
+  isGitHubUser: boolean;
   selectedProject: string | null;
   projects: string[];
   fetchGuestSession: () => Promise<void>;
@@ -47,10 +48,12 @@ export const SessionProvider = ({
   );
 
   const [projects, setProjects] = useState<string[]>([]);
+  const [isGitHubUser, setIsGitHubUser] = useState(false);
 
   // ✅ Sync session on login
   useEffect(() => {
     if (status === "authenticated" && session?.user?.id) {
+      setIsGitHubUser(true);
       localStorage.setItem(SESSION_STORAGE_KEY, session.user.id);
       setSessionId(session.user.id);
     }
@@ -150,6 +153,7 @@ export const SessionProvider = ({
         projects,
         fetchGuestSession,
         selectProject,
+        isGitHubUser,
       }}
     >
       {children}

@@ -1,8 +1,10 @@
 "use client";
 
 import { SessionProvider as NextAuthSessionProvider } from "next-auth/react";
-import { MenuProvider } from "./MenuContext";
-import { SessionProvider } from "./SessionProvider";
+import { MenuProvider } from "./react-context/MenuContext";
+import { SessionProvider } from "./react-context/SessionProvider";
+import { Provider } from "react-redux";
+import { store } from "../store/redux-toolkit/store";
 
 interface Props {
   children: React.ReactNode;
@@ -11,11 +13,13 @@ interface Props {
 export default function ContextProvider({ children }: Props) {
   return (
     <NextAuthSessionProvider>
-      <MenuProvider>
-        {" "}
-        {/* ✅ MenuProvider must be first */}
-        <SessionProvider>{children}</SessionProvider>
-      </MenuProvider>
+      <Provider store={store}>
+        <MenuProvider>
+          {" "}
+          {/* ✅ MenuProvider must be first */}
+          <SessionProvider>{children}</SessionProvider>
+        </MenuProvider>
+      </Provider>
     </NextAuthSessionProvider>
   );
 }

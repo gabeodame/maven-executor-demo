@@ -1,12 +1,7 @@
 "use client";
 
-import { useState } from "react";
-
-interface Artifact {
-  name: string;
-  isDirectory: boolean;
-  path: string;
-}
+import { useState, useCallback } from "react";
+import { Artifact } from "../types/types"; // ✅ Ensure correct type import
 
 interface ArtifactItemProps {
   artifact: Artifact;
@@ -15,39 +10,41 @@ interface ArtifactItemProps {
   handleDownload: (filePath: string) => void;
 }
 
-const ArtifactItem: React.FC<ArtifactItemProps> = ({
+const ArtifactItem = ({
   artifact,
   toggleExpand,
   expandedDirs,
   handleDownload,
-}) => {
-  const [expanded, setExpanded] = useState(false);
+}: ArtifactItemProps) => {
+  const [expanded, setExpanded] = useState<boolean>(false);
 
-  const handleToggle = async () => {
-    await toggleExpand(artifact.path);
+  const handleToggle = useCallback(async () => {
+    if (!expanded) {
+      await toggleExpand(artifact.path);
+    }
     setExpanded((prev) => !prev);
-  };
+  }, [expanded, artifact.path, toggleExpand]);
 
   return (
     <li className="text-sm">
-      {artifact.isDirectory ? (
+      {artifact.type === "directory" ? (
         <>
           <button
             onClick={handleToggle}
-            className="w-full flex items-center justify-between text-left px-2 py-1 rounded-md hover:bg-gray-600 transition"
+            className="w-full flex items-center justify-between text-left px-2 py-1 rounded-md hover:bg-gray-600 transition duration-200"
           >
             <span className="truncate w-full flex items-center gap-2">
               <span className="text-lg">📂</span> {artifact.name}
             </span>
-            <span className="text-gray-400 text-xs">
+            <span className="text-gray-400 text-xs transition duration-200">
               {expanded ? "▼" : "▶"}
             </span>
           </button>
 
-          {/* ✅ Recursively render subdirectory contents with improved spacing */}
-          {expandedDirs[artifact.path] &&
+          {/* ✅ Fix: Ensure `expandedDirs[artifact.path]` is properly accessed */}
+          {Array.isArray(expandedDirs[artifact.path]) &&
             expandedDirs[artifact.path].length > 0 && (
-              <ul className="ml-5 border-l-2 border-gray-600 pl-3 mt-1 space-y-1">
+              <ul className="ml-5 border-l-2 border-gray-600 pl-3 mt-1 space-y-1 transition-all duration-200">
                 {expandedDirs[artifact.path].map((subArtifact) => (
                   <ArtifactItem
                     key={subArtifact.path}
@@ -64,7 +61,7 @@ const ArtifactItem: React.FC<ArtifactItemProps> = ({
         <button
           type="button"
           onClick={() => handleDownload(artifact.path)}
-          className="w-full text-left flex items-center gap-2 px-2 py-1 rounded-md hover:bg-gray-700 transition"
+          className="w-full text-left flex items-center gap-2 px-2 py-1 rounded-md hover:bg-gray-700 transition duration-200"
         >
           <span className="text-lg">📄</span>
           <span className="truncate">{artifact.name}</span>

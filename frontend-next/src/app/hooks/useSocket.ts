@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import SocketService from "../services/SocketService";
 import { useSession } from "next-auth/react";
-import { useSessionCache } from "../store/SessionProvider";
+import { useSessionCache } from "../store/react-context/SessionProvider";
+import { toast } from "sonner";
 
 export const useSocket = () => {
   const { sessionId: cachedSessionId } = useSessionCache() || { sessionId: "" };
@@ -16,6 +17,7 @@ export const useSocket = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState(false);
   const [commandCompleted, setCommandCompleted] = useState(false);
+  const [cloneSuccess, setCloneSuccess] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!sessionId || sessionId.trim() === "") {
@@ -55,6 +57,7 @@ export const useSocket = () => {
       unsubscribeClone();
       setSocketService(null);
       setIsConnected(false);
+      unsubscribeCloneStatus();
     };
   }, [sessionId]); // ✅ Only re-run when `sessionId` changes
 
@@ -166,6 +169,21 @@ export const useSocket = () => {
     });
   };
 
+  // ✅ Listen for Clone Completion
+  const unsubscribeCloneStatus = () => {
+    if (!socketService || sessionId) return;
+
+    socketService.subscribeCloneStatus((status) => {
+      console.log("📡 [Clone Status Update]", status);
+      setCloneSuccess(status.success);
+      if (status.success) {
+        toast.success("✅ Repository cloned successfully!");
+      } else {
+        toast.error(`❌ Clone failed: ${status.error}`);
+      }
+    });
+  };
+
   return {
     mavenLogs,
     cloneLogs,
@@ -173,6 +191,7 @@ export const useSocket = () => {
     isConnected,
     runMavenCommand,
     triggerClone,
+    cloneSuccess,
     commandCompleted,
   };
 };

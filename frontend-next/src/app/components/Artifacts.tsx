@@ -1,41 +1,56 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSocket } from "../hooks/useSocket";
 import Accordion from "./ui/Accordion";
-import { useArtifacts } from "../hooks/useFetchArtifacts";
 import ArtifactItem from "./ArtifactItem";
+import { useSessionCache } from "../store/react-context/SessionProvider";
 
+import { useAppSelector, useAppDispatch } from "../store/hooks";
+import {
+  fetchArtifactsFromApi,
+  fetchSubArtifactsFromApi,
+} from "../store/redux-toolkit/slices/artifactSlice";
 import { getBackEndUrl } from "../util/getbackEndUrl";
-import { useSessionCache } from "../store/SessionProvider";
-import { useSelectedProject } from "../hooks/useSelectedProject";
-
-interface Artifact {
-  name: string;
-  isDirectory: boolean;
-  path: string;
-  children?: Artifact[];
-}
 
 export default function Artifacts() {
-  const [resetting, setResetting] = useState(false);
-  const [expandedDirs, setExpandedDirs] = useState<Record<string, Artifact[]>>(
-    {}
+  const dispatch = useAppDispatch();
+  const artifacts = useAppSelector((state) => state.artifacts.artifacts);
+  const expandedDirs = useAppSelector((state) => state.artifacts.expandedDirs); // ✅ Redux-managed expandedDirs
+  const selectedProject = useAppSelector(
+    (state) => state.projects.selectedProject
   );
 
-  const { artifacts, setArtifacts, fetchArtifacts } = useArtifacts();
-  const { runMavenCommand } = useSocket();
+  const loading = useAppSelector((state) => state.artifacts.loading);
+  const { commandCompleted, runMavenCommand } = useSocket();
   const { sessionId } = useSessionCache();
-  const { selectedProject } = useSelectedProject();
-  const backendUrl = getBackEndUrl();
 
-  // ✅ Ensure artifacts update when `selectedProject` changes
+  const [resetting, setResetting] = useState(false); // ✅ Local state for reset status
+  // ✅ Fetch artifacts when project changes or Maven command completes
   useEffect(() => {
-    console.log(`🎯 Re-fetching artifacts for new project: ${selectedProject}`);
-    fetchArtifacts();
-  }, [selectedProject, fetchArtifacts]);
+    if (sessionId && selectedProject) {
+      dispatch(fetchArtifactsFromApi({ sessionId, selectedProject }));
+    }
+  }, [sessionId, selectedProject, commandCompleted, dispatch]);
+
+  // ✅ Use Redux thunk to fetch sub-artifacts instead of direct API fetch
+  const toggleExpand = useCallback(
+    async (dirPath: string) => {
+      console.log(`📂 Toggling ${dirPath}`);
+
+      if (expandedDirs[dirPath]) {
+        dispatch({ type: "artifacts/collapseDir", payload: dirPath });
+      } else {
+        if (sessionId) {
+          dispatch(fetchSubArtifactsFromApi({ sessionId, dirPath }));
+        }
+      }
+    },
+    [expandedDirs, sessionId, dispatch]
+  );
 
   const handleDownload = (filePath: string) => {
+    const backendUrl = getBackEndUrl();
     const downloadUrl = `${backendUrl}/api/download?file=${encodeURIComponent(
       filePath
     )}`;
@@ -50,14 +65,24 @@ export default function Artifacts() {
 
     runMavenCommand("clean");
 
-    setArtifacts([]); // ✅ Clear artifacts immediately
-
-    // ✅ Ensure artifacts refresh after reset
     setTimeout(() => {
-      fetchArtifacts();
+      if (sessionId) {
+        dispatch(fetchArtifactsFromApi({ sessionId, selectedProject }));
+      }
       setResetting(false);
     }, 3000);
   };
+
+  // ✅ Ensure loading state is handled
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-40">
+        <div className="relative flex">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent border-solid rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-4xl mx-auto p-4 bg-gray-900 text-white rounded-lg shadow-md">
@@ -70,7 +95,7 @@ export default function Artifacts() {
           disabled={resetting}
           className="mb-4 w-full bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md disabled:bg-gray-600 transition"
         >
-          {resetting ? "🔄 Resetting..." : "🧹 Clean WorkSpace"}
+          {resetting ? "🔄 Resetting..." : "🧹 Clean Workspace"}
         </button>
       )}
 
@@ -87,44 +112,8 @@ export default function Artifacts() {
                     <ArtifactItem
                       key={artifact.path}
                       artifact={artifact}
-                      toggleExpand={async (dirPath) => {
-                        console.log(`📂 Toggling ${dirPath}`);
-                        if (expandedDirs[dirPath]) {
-                          setExpandedDirs((prev) => {
-                            const newDirs = { ...prev };
-                            delete newDirs[dirPath];
-                            return newDirs;
-                          });
-                        } else {
-                          console.log(`📂 Fetching ${dirPath}`);
-                          try {
-                            const res = await fetch(
-                              `${backendUrl}/api/artifacts?path=${encodeURIComponent(
-                                dirPath
-                              )}`,
-                              {
-                                method: "GET",
-                                headers: {
-                                  "Content-Type": "application/json",
-                                  "Cache-Control": "no-cache",
-                                  "x-session-id": sessionId || "",
-                                },
-                              }
-                            );
-                            const data: Artifact[] = await res.json();
-                            setExpandedDirs((prev) => ({
-                              ...prev,
-                              [dirPath]: data,
-                            }));
-                          } catch (error) {
-                            console.error(
-                              "❌ Error fetching sub-artifacts:",
-                              error
-                            );
-                          }
-                        }
-                      }}
-                      expandedDirs={expandedDirs}
+                      toggleExpand={toggleExpand} // ✅ Pass Redux-managed function
+                      expandedDirs={expandedDirs} // ✅ Use Redux-managed expandedDirs
                       handleDownload={handleDownload}
                     />
                   ))}

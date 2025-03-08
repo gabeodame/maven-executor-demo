@@ -1,7 +1,7 @@
 "use client";
 // import { useEffect, useState } from "react";
-import { useSocket } from "../hooks/useSocket";
-import { useSessionCache } from "../store/SessionProvider";
+import { useSocket } from "../../hooks/useSocket";
+import { useSessionCache } from "../../store/react-context/SessionProvider";
 import MavenButton from "./MavenButton";
 import { toast, Toaster } from "sonner";
 import { BsExclamationOctagonFill } from "react-icons/bs";
