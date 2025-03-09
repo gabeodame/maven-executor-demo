@@ -44,7 +44,7 @@ const MavenPipeline = () => {
             key={pipeline.name}
             onClick={() => handleRunPipeline(pipeline)}
             disabled={loading || runningPipeline !== null}
-            className={`px-4 py-2 text-white text-sm font-medium rounded-md transition-all duration-200 ${
+            className={`w-full px-4 py-2 text-white text-sm font-medium rounded-md transition-all duration-200 ${
               runningPipeline === pipeline.name
                 ? "bg-gray-500 cursor-not-allowed opacity-70"
                 : "bg-purple-600 hover:bg-purple-700"

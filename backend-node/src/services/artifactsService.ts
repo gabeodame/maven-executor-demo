@@ -204,3 +204,26 @@ export const handleArtifactReset = (
     return res.status(500).json({ error: "Failed to clear artifacts" });
   }
 };
+
+export const handleDownloadArtifact = (req: Request, res: Response) => {
+  const filePath = req.query.file as string;
+
+  if (!filePath) {
+    return res.status(400).json({ error: "File path is required" });
+  }
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "File not found" });
+  }
+
+  const fileName = path.basename(filePath);
+
+  // ✅ Set headers to force file download
+  res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+  res.setHeader("Content-Type", "application/octet-stream");
+
+  console.log(`📥 Downloading file: ${filePath}`);
+
+  const fileStream = fs.createReadStream(filePath);
+  fileStream.pipe(res);
+};

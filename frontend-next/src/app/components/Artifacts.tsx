@@ -33,6 +33,9 @@ export default function Artifacts() {
     }
   }, [sessionId, selectedProject, commandCompleted, dispatch]);
 
+  console.log("📦 selectedProject:", selectedProject);
+  console.log("📦 Artifacts:", artifacts);
+
   // ✅ Use Redux thunk to fetch sub-artifacts instead of direct API fetch
   const toggleExpand = useCallback(
     async (dirPath: string) => {

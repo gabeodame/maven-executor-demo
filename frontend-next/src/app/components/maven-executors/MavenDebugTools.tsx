@@ -33,7 +33,7 @@ const MavenDebugTools = () => {
             key={cmd}
             onClick={() => handleRunCommand(cmd)}
             disabled={loading}
-            className={`px-4 py-2 text-white text-sm font-medium rounded-md transition-all duration-200 ${
+            className={`w-full px-4 py-2 text-white text-sm font-medium rounded-md transition-all duration-200 ${
               loading && selectedCommand === cmd
                 ? "bg-gray-500 cursor-not-allowed opacity-70"
                 : "bg-blue-600 hover:bg-blue-700"

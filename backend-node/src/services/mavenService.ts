@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { execSync, spawn } from "child_process";
 import { Server, Socket } from "socket.io";
 import fs from "fs";
 import path from "path";
@@ -87,4 +87,23 @@ export const getBuildMetrics = (req: any, res: any) => {
     return res.json({ error: "No build metrics found for session." });
   }
   res.json(lastBuildMetrics[sessionId]);
+};
+
+export const getMavenVersion = (req: any, res: any) => {
+  console.log("🔍 Fetching Maven Version");
+  try {
+    const mvnVersionOutput = execSync("mvn -version", {
+      encoding: "utf-8",
+    }).split("\n")[0];
+
+    // Extract only the version number (e.g., "3.9.9")
+    const match = mvnVersionOutput.match(/Apache Maven (\d+\.\d+\.\d+)/);
+    const cleanVersion = match ? `Maven ${match[1]}` : "Maven: Unknown";
+
+    console.log(`🛠 Maven Version: ${cleanVersion}`);
+
+    res.json({ version: cleanVersion });
+  } catch (error) {
+    res.json({ version: "Maven: Unknown" });
+  }
 };

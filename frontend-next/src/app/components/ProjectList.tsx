@@ -1,101 +1,80 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import Accordion from "./ui/Accordion";
 import ProjectItem from "./ProjectItem";
 import { useSessionCache } from "../store/react-context/SessionProvider";
-import { getBackEndUrl } from "../util/getbackEndUrl";
-import { useSelectedProject } from "../hooks/useSelectedProject";
 import { toast } from "sonner";
-
-const PROJECT_STORAGE_KEY = "selectedProject";
+import { useAppSelector, useAppDispatch } from "../store/hooks";
+import {
+  fetchProjects,
+  selectProjectThunk,
+} from "../store/redux-toolkit/slices/projectSlice";
+import { getBackEndUrl } from "../util/getbackEndUrl";
 
 function ProjectList() {
-  const [projects, setProjects] = useState<string[]>([]);
-  const { selectProject, selectedProject, hasUserSelected } =
-    useSelectedProject();
+  const dispatch = useAppDispatch();
+  const { projects, selectedProject, loading } = useAppSelector(
+    (state) => state.projects
+  );
+  const { success } = useAppSelector((state) => state.repoCloneStatus);
   const { sessionId } = useSessionCache();
 
-  const hasFetched = useRef(false); // ✅ Prevent multiple fetches
-
-  // ✅ Fetch Projects
-  const fetchProjects = useCallback(async () => {
-    if (!sessionId || hasFetched.current) return; // ✅ Prevent duplicate fetch
-
-    console.log("📂 Fetching Projects...");
-    try {
-      const backendUrl = getBackEndUrl();
-      const res = await fetch(`${backendUrl}/api/user-projects`, {
-        headers: { "x-session-id": sessionId },
-      });
-
-      if (!res.ok) toast.error("Failed to fetch projects");
-
-      const projectList: string[] = await res.json();
-      console.log("📂 Fetched Projects:", projectList);
-      setProjects(projectList);
-
-      hasFetched.current = true; // ✅ Mark as fetched
-
-      // ✅ Restore Cached Project or Default to First **ONLY IF USER HASN’T SELECTED ONE**
-      if (!hasUserSelected.current) {
-        const cachedProject = localStorage.getItem(PROJECT_STORAGE_KEY);
-        if (cachedProject && projectList.includes(cachedProject)) {
-          selectProject(cachedProject);
-        } else if (projectList.length > 0) {
-          selectProject(projectList[0]);
-        }
-      }
-    } catch (error) {
-      console.error("❌ Error fetching projects:", error);
-    }
-  }, [sessionId, selectProject, hasUserSelected]);
+  const hasFetched = useRef(false);
 
   // ✅ Fetch Projects on Initial Mount
   useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+    if (!sessionId) return;
+    console.log(
+      "🚀 ~ file: ProjectList.tsx ~ line 33 ~ useEffect ~ sessionId",
+      sessionId
+    );
+    dispatch(fetchProjects(sessionId))
+      .unwrap()
+      .then((projectList) => {
+        if (projectList.length > 0) {
+          const project = projectList[0];
+          dispatch(selectProjectThunk({ sessionId, project })); // ✅ Select first project by default
+        }
+      })
+      .catch((err) => toast.error(`Failed to fetch projects: ${err}`));
+
+    hasFetched.current = true;
+  }, [dispatch, sessionId, success]);
+
+  console.log("📦 Projects:", projects);
+  console.log("📦 Success:", success);
 
   // ✅ Handle Project Deletion
   const handleDeleteProject = async (projectName: string) => {
-    if (!sessionId) {
-      toast.error("Session ID missing. Please refresh and try again.");
+    if (!sessionId || !projectName.length) {
+      console.warn("❌ Session ID or project name missing");
       return;
     }
-
-    if (projectName === "demo-java-app") {
-      alert("You cannot delete default demo app");
-      return;
-    }
-
-    const backendUrl = getBackEndUrl();
 
     try {
+      const backendUrl = getBackEndUrl();
       const response = await fetch(`${backendUrl}/api/delete-project`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
           "x-session-id": sessionId,
         },
-        body: JSON.stringify({ projectName }),
+        body: JSON.stringify({ sessionId, projectName }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to delete project");
-      }
+      if (!response.ok) throw new Error("Failed to delete project");
 
       toast.success(`🗑️ Project ${projectName} deleted successfully`);
 
-      // ✅ Remove from project list
-      const updatedProjects = projects.filter((p) => p !== projectName);
-      setProjects(updatedProjects);
-
-      // ✅ Set new default project
-      if (selectedProject === projectName) {
-        const newDefault =
-          updatedProjects.length > 0 ? updatedProjects[0] : null;
-        selectProject(newDefault as string);
-      }
+      // ✅ Dispatch fetchProjects to update the list
+      dispatch(fetchProjects(sessionId))
+        .unwrap()
+        .then((updatedProjects) => {
+          const newDefault =
+            updatedProjects.length > 0 ? updatedProjects[0] : null;
+          if (newDefault) dispatch(selectProjectThunk(newDefault));
+        });
     } catch (error) {
       console.error("❌ Error deleting project:", error);
       toast.error("Failed to delete project.");
@@ -108,6 +87,8 @@ function ProjectList() {
       bgColor="bg-gray-500"
       hoverColor="hover:bg-gray-600"
     >
+      {loading && <p className="text-gray-400">Loading projects...</p>}
+
       {projects.length > 0 ? (
         <div className="space-y-2">
           {projects.map((project, index) => (
@@ -116,16 +97,19 @@ function ProjectList() {
               project={project}
               index={index}
               handleSelectProject={() => {
-                hasUserSelected.current = true; // ✅ User manually selected a project
-                selectProject(project);
+                if (sessionId) {
+                  dispatch(selectProjectThunk({ sessionId, project }));
+                }
               }}
-              handleDeleteProject={() => handleDeleteProject(project)} // ✅ Pass delete handler
+              handleDeleteProject={() => handleDeleteProject(project)}
               selectedProject={selectedProject}
             />
           ))}
+
+          {/* {error && <p className="text-red-500">{error}</p>} */}
         </div>
       ) : (
-        <p className="text-gray-400">No projects available.</p>
+        !loading && <p className="text-gray-400">No projects available.</p>
       )}
     </Accordion>
   );

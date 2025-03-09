@@ -40,10 +40,14 @@ class SocketService {
       console.log("❌ WebSocket disconnected")
     );
 
+    // ✅ Avoid multiple event registrations
+    this.socket.removeAllListeners("maven-output");
+    this.socket.removeAllListeners("clone-log");
+
     // ✅ Listen for Maven logs
     this.socket.on("maven-output", (data: string) => {
       console.log(`📡 [WebSocket] Maven Output: ${data}`);
-      this.mavenLogs.push(data);
+      // this.mavenLogs.push(data);
       store.dispatch(addMavenLog(data));
 
       if (data.includes("BUILD SUCCESS") || data.includes("BUILD FAILURE")) {
@@ -59,11 +63,11 @@ class SocketService {
       console.log(`📡 [WebSocket] Clone Log: ${formattedLog}`);
       // this.cloneLogs.push(formattedLog);
       store.dispatch(addCloneLog(formattedLog));
-      if (data.includes("✅ Repository cloned successfully")) {
-        store.dispatch(cloneSuccess());
-      } else if (data.includes("❌ ERROR")) {
-        store.dispatch(cloneFailure(data));
-      }
+      // if (data.includes("✅ Repository cloned successfully")) {
+      //   store.dispatch(cloneSuccess());
+      // } else if (data.includes("❌ ERROR")) {
+      //   store.dispatch(cloneFailure(data));
+      // }
       this.notifyCloneSubscribers();
     });
 
@@ -75,8 +79,10 @@ class SocketService {
           console.log(
             `🎉 Clone completed successfully. Repo Path: ${data.repoPath}`
           );
-          this.cloneLogs.push(
-            `✅ Clone completed successfully: ${data.repoPath}`
+          store.dispatch(
+            data.success
+              ? cloneSuccess()
+              : cloneFailure(data.error || "Unknown error")
           );
         } else {
           console.error(`❌ Clone failed: ${data.error}`);
@@ -162,6 +168,12 @@ class SocketService {
       console.error("❌ ERROR: No session ID available!");
       return;
     }
+    if (this.loading) {
+      console.warn(
+        "⏳ Skipping duplicate command execution, still processing..."
+      );
+      return;
+    }
 
     // ✅ Always clear logs for a fresh start unless in a pipeline sequence
     if (type === "pipeline") {
@@ -174,8 +186,8 @@ class SocketService {
       this.clearCloneLogs();
       this.isFirstPipelineCommand = true;
     }
-
-    this.mavenLogs.push(`▶️ [CLIENT] Sending command: mvn ${command}`);
+    store.dispatch(addMavenLog(`▶️ [CLIENT] Sending command: mvn ${command}`));
+    // this.mavenLogs.push(`▶️ [CLIENT] Sending command: mvn ${command}`);
     this.setLoading(true);
     this.socket.emit("run-maven-command", command);
   }
@@ -229,18 +241,20 @@ class SocketService {
     this.clearCloneLogs(); // ✅ Clears previous logs before starting
 
     // ✅ Structured log output (Jenkins-style)
-    this.cloneLogs.push(`🛠️ Cloning repository: ${repoUrl}`);
-    this.cloneLogs.push(`🔄 Checking out branch: ${branch}`);
-    this.cloneLogs.push(
-      `📌 Git Command: git clone --branch ${branch} --depth=1 ${repoUrl}`
+    store.dispatch(addCloneLog(`🛠️ Cloning repository: ${repoUrl}`));
+    store.dispatch(addCloneLog(`🔄 Checking out branch: ${branch}`));
+    store.dispatch(
+      addCloneLog(
+        `📌 Git Command: git clone --branch ${branch} --depth=1 ${repoUrl}`
+      )
     );
 
     if (repoPath) {
-      this.cloneLogs.push(`📂 Target Subdirectory: ${repoPath}`);
+      store.dispatch(addCloneLog(`📂 Target Subdirectory: ${repoPath}`));
     }
 
     if (pomPath) {
-      this.cloneLogs.push(`📄 Custom pom.xml Path: ${pomPath}`);
+      store.dispatch(addCloneLog(`📄 Custom pom.xml Path: ${pomPath}`));
     }
 
     this.notifyCloneSubscribers(); // ✅ Notifies UI of initial clone logs
@@ -255,7 +269,7 @@ class SocketService {
     });
 
     // ✅ Add final pending log to indicate process is ongoing
-    this.cloneLogs.push("⏳ Cloning in progress...");
+    store.dispatch(addMavenLog("⏳ Cloning in progress..."));
     this.notifyCloneSubscribers();
   }
 }

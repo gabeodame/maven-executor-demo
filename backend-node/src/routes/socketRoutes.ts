@@ -4,8 +4,9 @@ import {
   initializeSessionWorkspace,
   getJavaProjectPath,
 } from "../config/projectPaths";
-import { cloneRepository } from "../services/cloneRepository";
+
 import { IncomingMessage } from "http";
+import { handleCloneRepository } from "../services/repoService";
 
 export const setupSocketRoutes = (io: Server) => {
   io.on("connection", (socket: Socket) => {
@@ -52,7 +53,7 @@ export const setupSocketRoutes = (io: Server) => {
         );
 
         // ✅ Pass io and socket correctly
-        const clonedPath = await cloneRepository(
+        const clonedPath = await handleCloneRepository(
           io, // ✅ Ensure io is passed
           socket, // ✅ Ensure socket is passed
           repoUrl,

@@ -48,6 +48,8 @@ const ConsoleOutput = () => {
     let welcomeMessage;
     if (!sessionId) {
       welcomeMessage = initialLogs;
+      dispatch(addMavenLog(""));
+      return;
     }
     if (sessionId) {
       welcomeMessage = isGitHubUser ? gitHubUserWelcome : guestUserWelcome;

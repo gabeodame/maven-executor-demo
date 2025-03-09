@@ -7,37 +7,58 @@ import { v4 as uuidv4 } from "uuid";
  * - Falls back to a cookie if available
  * - Creates a guest session only if no existing session is found
  */
-export const getSessionId = (req: Request, res: Response): string => {
-  let sessionId =
+
+// Session Expiry Durations
+const AUTH_SESSION_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days for authenticated users
+const GUEST_SESSION_EXPIRY = 30 * 60 * 1000; // 30 minutes for guest users
+
+// In-memory session cache
+const sessionCache = new Map<string, { expiresAt: number }>();
+
+export const getSessionId = (
+  req: Request,
+  res: Response
+): { session: string } | undefined => {
+  let sessionId: string =
     (req.headers["x-session-id"] as string) || req.cookies?.sessionId;
 
-  // ✅ If a guest session exists, reuse it instead of creating a new one
-  if (sessionId?.startsWith("guest-")) {
-    console.log(`🔄 Reusing existing guest session: ${sessionId}`);
+  // Check if session exists in cache and is valid
+  if (sessionId && sessionCache.has(sessionId)) {
+    const cachedSession = sessionCache.get(sessionId);
+    if (cachedSession && cachedSession.expiresAt > Date.now()) {
+      console.log(`✅ Using Cached Session: ${sessionId}`);
+      return { session: sessionId };
+    }
+    console.log(`⚠️ Expired session detected, creating a new one.`);
+    sessionCache.delete(sessionId);
   }
 
-  // ✅ Transition guest to actual user if logged in
-  if (sessionId?.startsWith("guest-") && req.headers["x-user-id"]) {
-    const userId = req.headers["x-user-id"] as string;
+  // Check if user is authenticated
+  const isAuthenticated = !!req.headers["x-user-id"];
+  const expiry = isAuthenticated ? AUTH_SESSION_EXPIRY : GUEST_SESSION_EXPIRY;
+
+  // If guest, assign a guest session ID
+  if (!sessionId || sessionId.startsWith("guest-")) {
+    sessionId = isAuthenticated
+      ? (req.headers["x-user-id"] as string)
+      : `guest-${uuidv4().slice(0, 10)}`;
     console.log(
-      `🔄 Converting guest session ${sessionId} to user session ${userId}`
+      `✅ New Session Created: ${sessionId} (Expiry: ${
+        isAuthenticated ? "7 days" : "30 minutes"
+      })`
     );
-    sessionId = userId;
   }
 
-  // ✅ Create a new guest session only if no valid session exists
-  if (!sessionId) {
-    sessionId = `guest-${uuidv4().slice(0, 10)}`;
-    console.log(`✅ New Guest Session Created: ${sessionId}`);
-  }
+  // Store session in cache
+  sessionCache.set(sessionId, { expiresAt: Date.now() + expiry });
 
-  // ✅ Store session ID in cookies for persistence (30 min for guests, 24h for logged-in users)
+  // Store session in cookies
   res.cookie("sessionId", sessionId, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: req.headers["x-user-id"] ? 24 * 60 * 60 * 1000 : 30 * 60 * 1000, // 24h for logged-in users, 30m for guests
+    maxAge: expiry,
   });
 
-  return sessionId;
+  res.json({ sessionId });
 };

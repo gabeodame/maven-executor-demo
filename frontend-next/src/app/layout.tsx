@@ -77,8 +77,12 @@ export default async function RootLayout({
           property="og:image"
           content="https://yourwebsite.com/og-image.jpg"
         />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, viewport-fit=cover"
+        />
 
-        <meta name="twitter:card" content="summary_large_image" />
+        {/* <meta name="twitter:card" content="summary_large_image" /> */}
 
         {/* ✅ Load Google Tag Manager (Async) */}
         <AdSense pId="ca-pub-2067270214726984" />
@@ -97,7 +101,7 @@ export default async function RootLayout({
       </head>
 
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col w-full overflow-hidden`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col w-full overflow-x-hidden overflow-y-auto`}
       >
         <ContextProvider>
           <div className="flex h-screen flex-col w-full overflow-hidden">

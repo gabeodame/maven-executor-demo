@@ -24,13 +24,13 @@ function UserAccount() {
   }, []);
 
   const handleSignOut = async () => {
-    dispatch(addMavenLog(""));
     localStorage.removeItem("sessionId");
     if (isGitHubUser) {
       await signOut({ callbackUrl: "/" });
     } else {
       window.location.reload();
     }
+    dispatch(addMavenLog(""));
   };
 
   if (!isClient) return null; // ✅ Prevent hydration mismatch
