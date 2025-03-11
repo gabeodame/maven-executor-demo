@@ -6,9 +6,14 @@ export const authOptions: NextAuthOptions = {
     GitHubProvider({
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          scope: "repo", // ✅ Request repo access
+        },
+      },
       profile(profile) {
         return {
-          id: profile.id.toString(), // ✅ Ensure ID is included
+          id: profile.id.toString(),
           name: profile.name || profile.login,
           email: profile.email,
           image: profile.avatar_url,
@@ -18,23 +23,18 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, account, user }) {
-      if (account) {
-        token.accessToken = account.access_token || null; // ✅ Store GitHub access token
-      }
-      if (user) {
-        token.id = user.id; // ✅ Store user ID
-        token.username = user.username || null;
+    async jwt({ token, account }) {
+      if (account?.access_token) {
+        token.accessToken = account.access_token; // ✅ Ensure token is stored
       }
       return token;
     },
     async session({ session, token }) {
       session.accessToken = token.accessToken || null;
       if (session.user) {
-        session.user.id = token.id; // ✅ Ensure ID is included in session
+        session.user.id = token.sub || token.id;
         session.user.username = token.username || "Unknown";
       }
-
       return session;
     },
   },

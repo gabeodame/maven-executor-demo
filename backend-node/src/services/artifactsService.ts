@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { Artifact } from "../types/types";
 import { Server } from "socket.io";
+import { Request, Response } from "express";
 
 /**
  * Recursively fetches artifacts in the specified directory.
@@ -10,7 +11,7 @@ const getArtifactsRecursively = (dirPath: string): Artifact[] => {
   if (!fs.existsSync(dirPath)) return [];
 
   return fs.readdirSync(dirPath, { withFileTypes: true }).map((entry) => {
-    const fullPath = path.join(dirPath, entry.name);
+    const fullPath = path.resolve(dirPath, entry.name);
     const stats = fs.statSync(fullPath);
 
     return {
@@ -19,17 +20,13 @@ const getArtifactsRecursively = (dirPath: string): Artifact[] => {
       size: entry.isFile() ? stats.size : undefined,
       type: entry.isDirectory() ? "directory" : "file",
       modifiedAt: stats.mtime.toISOString(),
-      children: entry.isDirectory() ? getArtifactsRecursively(fullPath) : [],
     };
   });
 };
 
-const MAX_BUILDS = 2; // ✅ Keeps only the latest 3 builds
-
 const cleanOldBuilds = (targetPath: string) => {
   if (!fs.existsSync(targetPath)) return;
 
-  // ✅ List only build directories
   const buildDirs = fs
     .readdirSync(targetPath, { withFileTypes: true })
     .filter((dir) => dir.isDirectory() && dir.name.startsWith("build-"))
@@ -38,11 +35,10 @@ const cleanOldBuilds = (targetPath: string) => {
       fullPath: path.join(targetPath, dir.name),
       createdAt: fs.statSync(path.join(targetPath, dir.name)).ctimeMs,
     }))
-    .sort((a, b) => b.createdAt - a.createdAt); // ✅ Sort descending by creation time
+    .sort((a, b) => b.createdAt - a.createdAt);
 
-  // ✅ Remove old builds beyond MAX_BUILDS
-  if (buildDirs.length > MAX_BUILDS) {
-    const oldBuilds = buildDirs.slice(MAX_BUILDS);
+  if (buildDirs.length > 2) {
+    const oldBuilds = buildDirs.slice(2);
     oldBuilds.forEach(({ fullPath }) => {
       fs.rmSync(fullPath, { recursive: true, force: true });
       console.log(`🗑 Removed old build: ${fullPath}`);
@@ -50,12 +46,10 @@ const cleanOldBuilds = (targetPath: string) => {
   }
 };
 
-import { Request, Response } from "express";
-
 export const handleGetArtifacts = (req: Request, res: Response, io: Server) => {
   const sessionId = req.headers["x-session-id"] as string | undefined;
-  const selectedProject = req.query.project as string; // Selected project
-  const requestedPath = req.query.path as string; // Subdirectory path
+  const selectedProject = req.query.project as string;
+  const requestedPath = req.query.path as string;
 
   console.log(
     `📂 Fetching artifacts for session: ${sessionId}, Project: ${selectedProject}`
@@ -72,21 +66,24 @@ export const handleGetArtifacts = (req: Request, res: Response, io: Server) => {
     return res.json({});
   }
 
-  // ✅ Fetch a specific path (e.g., subdirectory in target)
+  // ✅ Handle fetching subdirectory contents correctly
   if (requestedPath) {
-    const resolvedPath = path.join(sessionWorkspace, requestedPath);
+    const resolvedPath = path.resolve(requestedPath); // Prevents double path joins
+    if (!resolvedPath.startsWith(sessionWorkspace)) {
+      console.log(`❌ ERROR: Attempted path traversal attack: ${resolvedPath}`);
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     if (!fs.existsSync(resolvedPath)) {
       console.log(`⚠️ WARNING: Requested path does not exist: ${resolvedPath}`);
       return res.status(404).json({ error: "Requested path not found." });
     }
 
     console.log(`📂 Fetching contents of subdirectory: ${resolvedPath}`);
-    return res.json({
-      [selectedProject]: getArtifactsRecursively(resolvedPath),
-    });
+    return res.json(getArtifactsRecursively(resolvedPath));
   }
 
-  // ✅ If a project is specified, return its artifacts
+  // ✅ Fetch artifacts for a specific project
   if (selectedProject) {
     const projectTargetDir = path.join(
       sessionWorkspace,
@@ -97,19 +94,16 @@ export const handleGetArtifacts = (req: Request, res: Response, io: Server) => {
       console.log(
         `⚠️ WARNING: No target directory found for ${selectedProject}`
       );
-      return res.json({ [selectedProject]: [] }); // ✅ Empty array instead of error
+      return res.json({ [selectedProject]: [] });
     }
 
     try {
-      // ✅ Clean old builds before returning artifacts
       cleanOldBuilds(projectTargetDir);
-
       const projectArtifacts = getArtifactsRecursively(projectTargetDir);
+
       console.log(
         `📂 [SESSION: ${sessionId}] Found artifacts in: ${projectTargetDir}`
       );
-
-      // ✅ Send updates to Redux store for UI refresh
       io.to(sessionId).emit("artifacts-updated", {
         project: selectedProject,
         artifacts: projectArtifacts,
@@ -125,14 +119,13 @@ export const handleGetArtifacts = (req: Request, res: Response, io: Server) => {
     }
   }
 
-  // ✅ If no project is specified, return all projects' artifacts
+  // ✅ Fetch all projects' artifacts if no project is specified
   const projects = fs
     .readdirSync(sessionWorkspace, { withFileTypes: true })
     .filter((dir) => dir.isDirectory())
     .map((dir) => dir.name);
 
   const artifacts: Record<string, any> = {};
-
   for (const projectName of projects) {
     const projectTargetDir = path.join(sessionWorkspace, projectName, "target");
     if (!fs.existsSync(projectTargetDir)) {
@@ -142,9 +135,7 @@ export const handleGetArtifacts = (req: Request, res: Response, io: Server) => {
     }
 
     try {
-      // ✅ Clean up before returning results
       cleanOldBuilds(projectTargetDir);
-
       artifacts[projectName] = getArtifactsRecursively(projectTargetDir);
       console.log(
         `📂 [SESSION: ${sessionId}] Found artifacts in: ${projectTargetDir}`
@@ -161,6 +152,9 @@ export const handleGetArtifacts = (req: Request, res: Response, io: Server) => {
   return res.json(artifacts);
 };
 
+/**
+ * Handles resetting artifacts by deleting the target directory for a project.
+ */
 export const handleArtifactReset = (
   req: Request,
   res: Response,
@@ -205,6 +199,9 @@ export const handleArtifactReset = (
   }
 };
 
+/**
+ * Handles downloading an artifact file.
+ */
 export const handleDownloadArtifact = (req: Request, res: Response) => {
   const filePath = req.query.file as string;
 
@@ -218,7 +215,6 @@ export const handleDownloadArtifact = (req: Request, res: Response) => {
 
   const fileName = path.basename(filePath);
 
-  // ✅ Set headers to force file download
   res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
   res.setHeader("Content-Type", "application/octet-stream");
 

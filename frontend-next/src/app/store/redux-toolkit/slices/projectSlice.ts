@@ -27,8 +27,6 @@ export const fetchProjects = createAsyncThunk(
       return rejectWithValue("Session ID missing");
     }
 
-    console.log("📤 Fetching projects with sessionId:", sessionId);
-
     try {
       const response = await axios.get(`${backendUrl}/api/user-projects`, {
         headers: {
@@ -65,10 +63,6 @@ export const selectProjectThunk = createAsyncThunk(
       console.warn("❌ Missing sessionId or project in selectProjectThunk");
       return rejectWithValue("Missing session ID or project name");
     }
-
-    console.log(
-      `📤 Selecting project: ${project} with sessionId: ${sessionId}`
-    );
 
     try {
       const response = await axios.post(

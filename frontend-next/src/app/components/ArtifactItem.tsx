@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Artifact } from "../types/types"; // ✅ Ensure correct type import
+import { Artifact } from "../types/types";
 
 interface ArtifactItemProps {
   artifact: Artifact;
@@ -41,21 +41,19 @@ const ArtifactItem = ({
             </span>
           </button>
 
-          {/* ✅ Fix: Ensure `expandedDirs[artifact.path]` is properly accessed */}
-          {Array.isArray(expandedDirs[artifact.path]) &&
-            expandedDirs[artifact.path].length > 0 && (
-              <ul className="ml-5 border-l-2 border-gray-600 pl-3 mt-1 space-y-1 transition-all duration-200">
-                {expandedDirs[artifact.path].map((subArtifact) => (
-                  <ArtifactItem
-                    key={subArtifact.path}
-                    artifact={subArtifact}
-                    toggleExpand={toggleExpand}
-                    expandedDirs={expandedDirs}
-                    handleDownload={handleDownload}
-                  />
-                ))}
-              </ul>
-            )}
+          {expandedDirs[artifact.path]?.length > 0 && (
+            <ul className="ml-5 border-l-2 border-gray-600 pl-3 mt-1 space-y-1 transition-all duration-200">
+              {expandedDirs[artifact.path].map((subArtifact) => (
+                <ArtifactItem
+                  key={subArtifact.path}
+                  artifact={subArtifact}
+                  toggleExpand={toggleExpand}
+                  expandedDirs={expandedDirs}
+                  handleDownload={handleDownload}
+                />
+              ))}
+            </ul>
+          )}
         </>
       ) : (
         <button

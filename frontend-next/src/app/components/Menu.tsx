@@ -10,8 +10,6 @@ import UserAccount from "./UserAccount";
 const MobileMenu = () => {
   const { isOpen, toggleMenu, closeMenu } = useMenu();
 
-  console.log("Menu Open State:", isOpen);
-
   return (
     <>
       {isOpen && <style>{`body { overflow: hidden; }`}</style>}

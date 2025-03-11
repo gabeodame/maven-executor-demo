@@ -10,6 +10,8 @@ import {
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { getBackEndUrl } from "../../util/getbackEndUrl";
+import { useAppDispatch } from "@/app/store/hooks";
+import { selectProjectThunk } from "@/app/store/redux-toolkit/slices/projectSlice";
 
 const SESSION_STORAGE_KEY = "sessionId";
 const PROJECT_STORAGE_KEY = "selectedProject";
@@ -19,7 +21,8 @@ interface SessionContextType {
   isGitHubUser: boolean;
   selectedProject: string | null;
   projects: string[];
-  fetchGuestSession: () => Promise<void>;
+  accessToken: string | null;
+  fetchGuestSession: () => Promise<void>; // ✅ Explicit call for guest sessions
   selectProject: (project: string) => Promise<void>;
 }
 
@@ -34,6 +37,7 @@ export const SessionProvider = ({
 }) => {
   const { data: session, status } = useSession();
   const backendUrl = getBackEndUrl();
+  const dispatch = useAppDispatch();
 
   const [sessionId, setSessionId] = useState<string | null>(() =>
     typeof window !== "undefined"
@@ -49,8 +53,18 @@ export const SessionProvider = ({
 
   const [projects, setProjects] = useState<string[]>([]);
   const [isGitHubUser, setIsGitHubUser] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
-  // ✅ Sync session on login
+  // ✅ Store accessToken in state for consistent rendering
+  useEffect(() => {
+    if (session?.accessToken) {
+      setAccessToken(session.accessToken);
+    }
+  }, [session]);
+
+  console.log("🔑 GitHub Access Token:", accessToken); // ✅ Debugging line
+
+  // ✅ Sync session on login (GitHub users)
   useEffect(() => {
     if (status === "authenticated" && session?.user?.id) {
       setIsGitHubUser(true);
@@ -59,7 +73,7 @@ export const SessionProvider = ({
     }
   }, [session, status]);
 
-  // ✅ Fetch guest session if needed
+  // ✅ Fetch a guest session only when explicitly requested
   const fetchGuestSession = async () => {
     try {
       const res = await fetch(`${backendUrl}/api/get-session`, {
@@ -74,6 +88,8 @@ export const SessionProvider = ({
       console.error("❌ Error fetching session ID:", error);
     }
   };
+
+  // ❌ Removed automatic guest session fetching to maintain session continuity
 
   // ✅ Fetch projects & restore cached project
   useEffect(() => {
@@ -109,7 +125,7 @@ export const SessionProvider = ({
     fetchProjects();
   }, [sessionId, backendUrl]);
 
-  // ✅ Select a project without triggering UI
+  // ✅ Select project and update Redux state
   const selectProject = useCallback(
     async (project: string) => {
       if (!project || project === selectedProject) return;
@@ -118,16 +134,11 @@ export const SessionProvider = ({
       localStorage.setItem(PROJECT_STORAGE_KEY, project);
 
       try {
-        if (!sessionId) {
-          console.warn("⚠️ No session ID found. Cannot update project.");
-          return;
-        }
-
         const response = await fetch(`${backendUrl}/api/select-project`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-session-id": sessionId,
+            ...(sessionId && { "x-session-id": sessionId }),
           },
           body: JSON.stringify({ projectName: project }),
         });
@@ -136,13 +147,18 @@ export const SessionProvider = ({
           toast.error("Failed to select project.");
         } else {
           toast.success(`✅ Project switched to ${project}`);
+          if (sessionId) {
+            dispatch(selectProjectThunk({ sessionId, project }));
+          } else {
+            toast.error("Session ID is missing.");
+          }
         }
       } catch (error) {
         console.error("❌ Project selection error:", error);
         toast.error("Failed to select project.");
       }
     },
-    [backendUrl, sessionId, selectedProject]
+    [backendUrl, sessionId, selectedProject, dispatch]
   );
 
   return (
@@ -151,9 +167,10 @@ export const SessionProvider = ({
         sessionId,
         selectedProject,
         projects,
-        fetchGuestSession,
+        fetchGuestSession, // ✅ User must call this manually to get a guest session
         selectProject,
         isGitHubUser,
+        accessToken,
       }}
     >
       {children}

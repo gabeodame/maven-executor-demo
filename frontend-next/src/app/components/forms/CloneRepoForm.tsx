@@ -1,5 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import * as yup from "yup";
+import { yupResolver } from "@hookform/resolvers/yup";
+
 import {
   Dialog,
   DialogContent,
@@ -14,96 +19,126 @@ import { Label } from "@/components/ui/label";
 interface CloneRepoFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onClone: () => void;
+  onClone: (formData: CloneRepoFormData) => void;
   repoName: string;
-  branch: string;
-  setBranch: (value: string) => void;
-  projectName: string;
-  setProjectName: (value: string) => void;
-  pomPath: string;
-  setPomPath: (value: string) => void;
-  repoPath: string;
-  setRepoPath: (value: string) => void;
+  branches: string[];
 }
+
+interface CloneRepoFormData {
+  branch: string;
+  projectName: string;
+  pomPath?: string;
+  repoPath?: string;
+}
+
+// ✅ Form Validation Schema (Using Yup)
+const cloneRepoSchema = yup.object().shape({
+  branch: yup.string().required("Branch is required"),
+  projectName: yup.string().required("Project name is required"),
+  pomPath: yup.string().optional(),
+  repoPath: yup.string().optional(),
+});
 
 const CloneRepoForm = ({
   isOpen,
   onClose,
   onClone,
   repoName,
-  branch,
-  setBranch,
-  projectName,
-  setProjectName,
-  pomPath,
-  setPomPath,
-  repoPath,
-  setRepoPath,
+  branches,
 }: CloneRepoFormProps) => {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<CloneRepoFormData>({
+    resolver: yupResolver(cloneRepoSchema),
+  });
+
+  // ✅ Prefill form fields when the modal opens
+  useEffect(() => {
+    if (repoName) {
+      reset({
+        branch: branches.includes("main") ? "main" : branches[0] || "",
+        projectName: repoName, // ✅ Prefill project name with repoName
+        pomPath: "",
+        repoPath: "",
+      });
+    }
+  }, [repoName, branches, reset]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="bg-gray-900 text-white border border-gray-700 shadow-xl">
         <DialogHeader>
           <DialogTitle>
-            Clone Repository: <span className="text-cyan-400">{repoName}</span>
+            Clone Repository: {repoName || "Select a repository"}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        {/* ✅ Form Submission */}
+        <form onSubmit={handleSubmit(onClone)} className="space-y-4">
+          {/* 🔹 Branch Selection */}
           <div className="flex flex-col gap-2">
             <Label htmlFor="branch">Branch</Label>
-            <Input
+            <select
+              {...register("branch")}
               id="branch"
-              type="text"
-              value={branch}
-              onChange={(e) => setBranch(e.target.value)}
-            />
+              className="w-full p-2 bg-gray-800 border border-gray-600 rounded-md"
+            >
+              {branches.length > 0 ? (
+                branches.map((branch) => (
+                  <option key={branch} value={branch}>
+                    {branch}
+                  </option>
+                ))
+              ) : (
+                <option value="main">main</option>
+              )}
+            </select>
+            {errors.branch && (
+              <p className="text-red-400 text-sm">{errors.branch.message}</p>
+            )}
           </div>
 
+          {/* 🔹 Project Name */}
           <div className="flex flex-col gap-2">
             <Label htmlFor="project-name">Project Name</Label>
-            <Input
-              id="project-name"
-              type="text"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-            />
+            <Input {...register("projectName")} id="project-name" />
+            {errors.projectName && (
+              <p className="text-red-400 text-sm">
+                {errors.projectName.message}
+              </p>
+            )}
           </div>
 
+          {/* 🔹 Custom pom.xml Path */}
           <div className="flex flex-col gap-2">
-            <Label htmlFor="pom-path">Custom pom.xml Path</Label>
-            <Input
-              id="pom-path"
-              type="text"
-              value={pomPath}
-              onChange={(e) => setPomPath(e.target.value)}
-            />
+            <Label htmlFor="pom-path">Custom pom.xml Path (optional)</Label>
+            <Input {...register("pomPath")} id="pom-path" />
           </div>
 
+          {/* 🔹 Repository Subdirectory */}
           <div className="flex flex-col gap-2">
             <Label htmlFor="repo-path">
               Repository Subdirectory (optional)
             </Label>
-            <Input
-              id="repo-path"
-              type="text"
-              value={repoPath}
-              onChange={(e) => setRepoPath(e.target.value)}
-            />
+            <Input {...register("repoPath")} id="repo-path" />
           </div>
-        </div>
 
-        <DialogFooter className="mt-4 flex justify-end space-x-3">
-          <Button
-            onClick={onClone}
-            className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md"
-          >
-            🔂 Clone Repo
-          </Button>
-          <Button onClick={onClose} variant="destructive">
-            Cancel
-          </Button>
-        </DialogFooter>
+          {/* ✅ Form Actions */}
+          <DialogFooter className="mt-4 flex justify-end space-x-3">
+            <Button
+              type="submit"
+              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md"
+            >
+              🔂 Clone Repo
+            </Button>
+            <Button type="button" onClick={onClose} variant="destructive">
+              Cancel
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -1,94 +1,148 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
 import Accordion from "./ui/Accordion";
 import CloneRepoForm from "./forms/CloneRepoForm";
+import Spinner from "./ui/Spinner"; // ✅ Fancy Spinner
 import { useSessionCache } from "../store/react-context/SessionProvider";
 import { useMenu } from "../store/react-context/MenuContext";
 import { useModal } from "../store/react-context/ModalContext";
 import { useSocket } from "../hooks/useSocket";
 import { useAppDispatch } from "../store/hooks";
 import {
+  fetchProjects,
   selectProjectThunk,
   setProjects,
 } from "../store/redux-toolkit/slices/projectSlice";
+// import { getBackEndUrl } from "../util/getbackEndUrl";
 
 interface Repository {
   id: number;
   name: string;
+  owner: string;
   clone_url: string;
+  branches_url: string;
 }
 
 export default function RepoList() {
   const [repos, setRepos] = useState<Repository[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
-  const [branch, setBranch] = useState("main");
-  const [projectName, setProjectName] = useState("");
-  const [pomPath, setPomPath] = useState("");
-  const [repoPath, setRepoPath] = useState("");
+  const [branches, setBranches] = useState<string[]>([]); // ✅ Store repo branches
 
   const { closeMenu } = useMenu();
   const { isOpenModal, openModal, closeModal } = useModal();
   const { sessionId } = useSessionCache();
   const { triggerClone } = useSocket();
   const dispatch = useAppDispatch();
+  // const backendUrl = getBackEndUrl();
 
   // ✅ Fetch repositories from backend
-  const fetchRepos = useCallback(async () => {
+  useEffect(() => {
     if (!sessionId) return;
 
-    setLoading(true);
-    try {
-      const res = await fetch("/api/github/repos", {
-        headers: { "x-session-id": sessionId },
-      });
+    const fetchRepos = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/github/repos`, {
+          headers: { "x-session-id": sessionId },
+        });
 
-      if (!res.ok) throw new Error("Failed to fetch repositories");
+        if (!res.ok) throw new Error("Failed to fetch repositories");
 
-      const data: Repository[] = await res.json();
-      setRepos(data);
-    } catch (error) {
-      console.error("❌ Error fetching repos:", error);
-      toast.error("Failed to load repositories.");
-    } finally {
-      setLoading(false);
-    }
+        const data: Repository[] = await res.json();
+        setRepos(data);
+      } catch (error) {
+        console.error("❌ Error fetching repos:", error);
+        toast.error("Failed to load repositories.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRepos();
   }, [sessionId]);
 
-  useEffect(() => {
-    fetchRepos();
-  }, [fetchRepos]);
+  // ✅ Fetch branches for selected repo
+  const fetchBranches = async (repo: Repository) => {
+    if (!repo || !repo.branches_url) {
+      console.error("❌ No valid repository selected.");
+      return [];
+    }
+
+    try {
+      const res = await fetch(`/api/github/branches`, {
+        method: "POST", // ✅ Use POST to send branches_url
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": sessionId || "",
+        },
+        body: JSON.stringify({ branches_url: repo.branches_url }),
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch branches");
+
+      const data = await res.json();
+      return data.branches || [];
+    } catch (error) {
+      console.error("❌ Error fetching branches:", error);
+      return [];
+    }
+  };
 
   // ✅ Handle repository selection
-  const handleRepoSelect = (repoName: string) => {
-    const selected = repos.find((repo) => repo.name === repoName);
-    if (!selected) return;
+  const handleRepoSelect = async (repo: Repository) => {
+    console.log("🚀 Opening Clone Modal");
+    console.log("📦 Selected Repo:", repo);
 
-    setSelectedRepo(selected);
-    setBranch("main");
-    setProjectName(repoName);
-    setPomPath("");
-    setRepoPath("");
+    setSelectedRepo(repo);
+    setBranches([]); // ✅ Clear previous branches
+
+    // ✅ Fetch branches dynamically & update state
+    const fetchedBranches = await fetchBranches(repo);
+    setBranches(fetchedBranches);
 
     closeMenu();
-    setTimeout(() => openModal(), 200);
+    setTimeout(() => openModal(), 300);
   };
 
   // ✅ Handle repository cloning
-  const handleClone = () => {
-    if (!selectedRepo) return;
+  const handleClone = async (formData: {
+    branch: string;
+    projectName: string;
+    pomPath?: string;
+    repoPath?: string;
+  }) => {
+    if (!selectedRepo || !sessionId) return;
 
-    closeModal(); // ✅ Close modal immediately to see logs
-    triggerClone(selectedRepo.clone_url, branch, projectName, repoPath, pomPath)
-      .then(() => {
-        toast.success(`🎉 Successfully cloned ${selectedRepo.name}`);
-        dispatch(setProjects([projectName])); // ✅ Update Redux store
-      })
-      .catch((err) => toast.error(`❌ Clone failed: ${err.message}`));
-    if (sessionId) {
-      dispatch(selectProjectThunk({ sessionId, project: projectName })); // ✅ Select newly cloned project
+    const { branch, projectName, pomPath, repoPath } = formData;
+
+    closeModal();
+    try {
+      await triggerClone(
+        selectedRepo.clone_url,
+        branch,
+        projectName || selectedRepo.name, // ✅ Default to repo name if empty
+        repoPath,
+        pomPath
+      );
+
+      toast.success(`🎉 Successfully cloned ${selectedRepo.name}`);
+
+      // ✅ Fetch updated project list
+      dispatch(fetchProjects(sessionId))
+        .unwrap()
+        .then((updatedProjects) => {
+          dispatch(setProjects(updatedProjects));
+
+          if (updatedProjects.includes(projectName)) {
+            dispatch(selectProjectThunk({ sessionId, project: projectName }));
+          }
+        });
+    } catch (err) {
+      console.error("❌ Clone failed:", err);
+      toast.error(`❌ Clone failed: ${err}`);
     }
   };
 
@@ -103,15 +157,8 @@ export default function RepoList() {
         isOpen={isOpenModal}
         onClose={closeModal}
         onClone={handleClone}
-        repoName={projectName}
-        branch={branch}
-        setBranch={setBranch}
-        projectName={projectName}
-        setProjectName={setProjectName}
-        pomPath={pomPath}
-        setPomPath={setPomPath}
-        repoPath={repoPath}
-        setRepoPath={setRepoPath}
+        repoName={selectedRepo?.name || ""}
+        branches={branches}
       />
 
       {/* ✅ Repository Selection */}
@@ -119,24 +166,24 @@ export default function RepoList() {
         <h2 className="font-semibold mb-4 text-center">Select a Repository</h2>
 
         {loading ? (
-          <div className="flex justify-center items-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white"></div>
+          <div className="flex justify-center items-center h-20">
+            <Spinner size="lg" color="cyan" />
           </div>
         ) : (
-          <div className="space-y-4">
-            <select
-              value={selectedRepo?.name || ""}
-              onChange={(e) => handleRepoSelect(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-cyan-500"
-            >
-              <option value="">-- Select a Repository --</option>
-              {repos.map((repo) => (
-                <option key={repo.id} value={repo.name} className="bg-blue-700">
-                  {repo.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            onChange={(e) => {
+              const repo = repos.find((r) => r.name === e.target.value);
+              if (repo) handleRepoSelect(repo);
+            }}
+            className="w-full p-3 bg-gray-800 border border-gray-700 focus:ring-2 focus:ring-cyan-500 rounded-lg"
+          >
+            <option value="">-- Select a Repository --</option>
+            {repos.map((repo) => (
+              <option key={repo.id} value={repo.name} className="bg-blue-700">
+                {repo.name}
+              </option>
+            ))}
+          </select>
         )}
 
         <Toaster />

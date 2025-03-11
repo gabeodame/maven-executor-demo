@@ -43,7 +43,7 @@ export const useSocket = () => {
       return;
     }
 
-    console.log("🔌 useSocket: Initializing WebSocket for session:", sessionId);
+    // console.log("🔌 useSocket: Initializing WebSocket for session:", sessionId);
     const newSocketService = SocketService.getInstance(sessionId);
     setSocketService(newSocketService);
     setIsConnected(true);
@@ -67,7 +67,7 @@ export const useSocket = () => {
     // ✅ Listen for Clone Completion
     const unsubscribeCloneStatus = newSocketService.subscribeCloneStatus(
       (status) => {
-        console.log("📡 [Clone Status Update]", status);
+        // console.log("📡 [Clone Status Update]", status);
         setCloneSuccess(status.success);
 
         if (status.success) {
@@ -93,10 +93,10 @@ export const useSocket = () => {
     );
 
     return () => {
-      console.log(
-        "🔌 useSocket: Cleaning up WebSocket for session:",
-        sessionId
-      );
+      // console.log(
+      //   "🔌 useSocket: Cleaning up WebSocket for session:",
+      //   sessionId
+      // );
       unsubscribeMaven();
       unsubscribeClone();
       unsubscribeCloneStatus();
@@ -114,9 +114,9 @@ export const useSocket = () => {
       return;
     }
 
-    console.log(
-      `▶️ [CLIENT] Sending command: mvn ${cmd} | Session ID: ${sessionId}`
-    );
+    // console.log(
+    //   `▶️ [CLIENT] Sending command: mvn ${cmd} | Session ID: ${sessionId}`
+    // );
 
     if (loading) {
       console.warn(
@@ -158,9 +158,9 @@ export const useSocket = () => {
       return Promise.reject(new Error("WebSocket is not connected."));
     }
 
-    console.log(
-      `▶️ [CLIENT] Triggering repository clone: ${repoUrl} | Branch: ${branch}`
-    );
+    // console.log(
+    //   `▶️ [CLIENT] Triggering repository clone: ${repoUrl} | Branch: ${branch}`
+    // );
 
     dispatch(clearCloneLogs()); // ✅ Clear previous logs before starting
 
