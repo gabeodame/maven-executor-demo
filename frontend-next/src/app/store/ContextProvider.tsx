@@ -2,9 +2,9 @@
 
 import { SessionProvider as NextAuthSessionProvider } from "next-auth/react";
 import { MenuProvider } from "./react-context/MenuContext";
-import { SessionProvider } from "./react-context/SessionProvider";
+// import { SessionProvider } from "./react-context/SessionProvider";
 import { Provider } from "react-redux";
-import { store } from "../store/redux-toolkit/store";
+import { store } from "./redux-toolkit/store";
 
 interface Props {
   children: React.ReactNode;
@@ -17,7 +17,7 @@ export default function ContextProvider({ children }: Props) {
         <MenuProvider>
           {" "}
           {/* ✅ MenuProvider must be first */}
-          <SessionProvider>{children}</SessionProvider>
+          {children}
         </MenuProvider>
       </Provider>
     </NextAuthSessionProvider>

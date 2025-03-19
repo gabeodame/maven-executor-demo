@@ -3,6 +3,7 @@ import logReducer from "./slices/logSlice";
 import projectReducer from "./slices/projectSlice";
 import artifactReducer from "./slices/artifactSlice";
 import repoCloneStatusReducer from "./slices/repoCloneStatusSlice";
+import sessionReducer from "./slices/sessionSlice";
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     projects: projectReducer,
     artifacts: artifactReducer,
     repoCloneStatus: repoCloneStatusReducer,
+    session: sessionReducer,
   },
 });
 

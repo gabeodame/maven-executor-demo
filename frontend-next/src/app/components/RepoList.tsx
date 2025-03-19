@@ -5,16 +5,17 @@ import { Toaster, toast } from "sonner";
 import Accordion from "./ui/Accordion";
 import CloneRepoForm from "./forms/CloneRepoForm";
 import Spinner from "./ui/Spinner"; // ✅ Fancy Spinner
-import { useSessionCache } from "../store/react-context/SessionProvider";
+// import { useSessionCache } from "../store/react-context/SessionProvider";
 import { useMenu } from "../store/react-context/MenuContext";
 import { useModal } from "../store/react-context/ModalContext";
 import { useSocket } from "../hooks/useSocket";
-import { useAppDispatch } from "../store/hooks";
+import { useAppDispatch } from "../store/hooks/hooks";
 import {
   fetchProjects,
   selectProjectThunk,
   setProjects,
 } from "../store/redux-toolkit/slices/projectSlice";
+import { useSessionCache } from "../store/hooks/useSessionCache";
 // import { getBackEndUrl } from "../util/getbackEndUrl";
 
 interface Repository {
@@ -141,7 +142,7 @@ export default function RepoList() {
           }
         });
     } catch (err) {
-      console.error("❌ Clone failed:", err);
+      // console.error("❌ Clone failed:", err);
       toast.error(`❌ Clone failed: ${err}`);
     }
   };

@@ -1,10 +1,11 @@
 "use client";
 // import { useEffect, useState } from "react";
 import { useSocket } from "../../hooks/useSocket";
-import { useSessionCache } from "../../store/react-context/SessionProvider";
+// import { useSessionCache } from "../../store/react-context/SessionProvider";
 import MavenButton from "./MavenButton";
 import { toast, Toaster } from "sonner";
 import { BsExclamationOctagonFill } from "react-icons/bs";
+import { useSessionCache } from "@/app/store/hooks/useSessionCache";
 
 const Executor = () => {
   const { loading, runMavenCommand } = useSocket();

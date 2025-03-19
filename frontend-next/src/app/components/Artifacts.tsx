@@ -4,14 +4,15 @@ import { useState, useEffect, useCallback } from "react";
 import { useSocket } from "../hooks/useSocket";
 import Accordion from "./ui/Accordion";
 import ArtifactItem from "./ArtifactItem";
-import { useSessionCache } from "../store/react-context/SessionProvider";
-import { useAppSelector, useAppDispatch } from "../store/hooks";
+// import { useSessionCache } from "../store/react-context/SessionProvider";
+import { useAppSelector, useAppDispatch } from "../store/hooks/hooks";
 import {
   fetchArtifactsFromApi,
   fetchSubArtifactsFromApi,
   clearArtifacts,
 } from "../store/redux-toolkit/slices/artifactSlice";
 import { getBackEndUrl } from "../util/getbackEndUrl";
+import { useSessionCache } from "../store/hooks/useSessionCache";
 
 export default function Artifacts() {
   const dispatch = useAppDispatch();

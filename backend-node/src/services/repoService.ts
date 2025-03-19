@@ -5,6 +5,11 @@ import path from "path";
 import { Server, Socket } from "socket.io";
 import { execSync } from "child_process";
 
+/**
+ * ✅ Handles setting the repository path for a session.
+ * - Ensures the `repoPath` exists before setting.
+ * - Stores the session path for debugging.
+ */
 export const handleSetRepoPath = (req: Request, res: Response) => {
   const sessionId = req.headers["x-session-id"] as string;
   const { repoPath } = req.body;
@@ -39,6 +44,12 @@ export const handleSetRepoPath = (req: Request, res: Response) => {
   });
 };
 
+/**
+ * ✅ Handles cloning a repository for a given session.
+ * - Checks for existing repo & fetches updates if available.
+ * - Cleans untracked files to ensure a fresh repo state.
+ * - Ensures `repoPath` and `pom.xml` exist before proceeding.
+ */
 export const handleCloneRepository = async (
   io: Server,
   socket: Socket,
@@ -56,12 +67,15 @@ export const handleCloneRepository = async (
 
   /**
    * Sends a log message to both console and WebSocket.
+   * Clears previous logs before starting clone process.
    */
-  const sendLog = (msg: string) => {
-    console.log(`[Backend] ${msg}`);
-    if (socket && typeof socket.emit === "function") {
-      socket.emit("clone-log", msg);
+  const sendLog = (msg: string, clearLogs: boolean = false) => {
+    if (clearLogs) {
+      console.clear(); // ✅ Clears initial logs for a clean console
+      socket.emit("clear-clone-logs"); // ✅ Clears logs on frontend UI
     }
+    console.log(`[Backend] ${msg}`);
+    socket.emit("clone-log", msg);
   };
 
   sendLog(`🔍 Checking workspace for session: ${sessionId}`);
@@ -185,16 +199,19 @@ export const handleCloneRepository = async (
 
     return projectDir;
   } catch (error) {
-    const recivedError = error instanceof Error ? error.message : error;
+    const receivedError = error instanceof Error ? error.message : error;
 
-    sendLog(`❌ ERROR: Clone process failed: ${recivedError}`);
+    sendLog(`❌ ERROR: Clone process failed: ${receivedError}`);
 
     // ✅ Emit WebSocket event for failure
     io.to(sessionId).emit("repo-clone-status", {
       success: false,
-      error: recivedError,
+      error: receivedError,
     });
 
     throw error;
   }
 };
+
+// // ✅ Export functions
+// export { handleSetRepoPath, handleCloneRepository };

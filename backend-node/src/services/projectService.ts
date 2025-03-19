@@ -95,7 +95,7 @@ export const selectProject = (req: Request, res: Response) => {
 export const deleteProject = (req: Request, res: Response) => {
   const { projectName } = req.body;
 
-  if (!projectName.length) {
+  if (!projectName?.length) {
     return res.status(400).json({ error: "Project name is required" });
   }
 
