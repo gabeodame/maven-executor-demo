@@ -47,7 +47,7 @@ export const useSocket = () => {
     socketServiceRef.current = newSocketService;
     setIsConnected(true);
 
-    // ✅ Maven Logs Subscription (Efficient batching)
+    // ✅ Subscribe to Maven Logs & Push to Redux
     const unsubscribeMavenLogs = newSocketService.subscribe(
       (newLogs, isLoading) => {
         logBuffer.current.push(...newLogs);
@@ -67,7 +67,7 @@ export const useSocket = () => {
       }
     );
 
-    // ✅ Clone Logs Subscription (Efficient batching)
+    // ✅ Subscribe to Clone Logs
     unsubscribeCloneLogsRef.current = newSocketService.subscribeCloneLogs(
       (newLogs) => {
         cloneLogBuffer.current.push(...newLogs);
@@ -84,7 +84,7 @@ export const useSocket = () => {
       }
     );
 
-    // ✅ Clone Status Subscription
+    // ✅ Subscribe to Clone Status
     const unsubscribeCloneStatus = newSocketService.subscribeCloneStatus(
       (status) => {
         console.log("📡 [Clone Status Update]", status);

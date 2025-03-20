@@ -6,7 +6,7 @@ interface LogState {
 }
 
 const initialState: LogState = {
-  mavenLogs: [], // ✅ Ensure initial logs are set
+  mavenLogs: [],
   cloneLogs: [],
 };
 
@@ -26,13 +26,9 @@ const logSlice = createSlice({
     clearCloneLogs: (state) => {
       state.cloneLogs = [];
     },
-    // resetLogsForGuest: (state) => {
-    //   state.mavenLogs = [...initialLogs]; // ✅ Reset logs for guest users
-    // },
   },
 });
 
 export const { addMavenLog, clearMavenLogs, addCloneLog, clearCloneLogs } =
   logSlice.actions;
-
 export default logSlice.reducer;

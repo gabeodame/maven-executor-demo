@@ -1,6 +1,7 @@
 "use client";
+
 import { useEffect, useState } from "react";
-import { useSocket } from "../hooks/useSocket";
+import { useAppSelector } from "../store/hooks/hooks";
 
 interface BuildMetrics {
   status: string;
@@ -12,7 +13,9 @@ interface BuildMetrics {
 }
 
 export default function BuildMetrics() {
-  const { mavenLogs: logs } = useSocket();
+  // ✅ Fetch logs from Redux instead of `useSocket()`
+  const logs = useAppSelector((state) => state.logs.mavenLogs);
+
   const [metrics, setMetrics] = useState<BuildMetrics>({
     status: "Pending",
     totalTime: null,
@@ -22,11 +25,8 @@ export default function BuildMetrics() {
     warnings: 0,
   });
 
-  //   console.log("📊 Build Metrics Logs:", logs);
   useEffect(() => {
-    if (logs?.length === 0) return;
-
-    // console.log("📊 Processing logs for Build Metrics...");
+    if (!logs.length) return;
 
     const newMetrics: BuildMetrics = {
       status: "In Progress",
@@ -37,7 +37,7 @@ export default function BuildMetrics() {
       warnings: 0,
     };
 
-    logs?.forEach((log) => {
+    logs.forEach((log) => {
       if (log.includes("BUILD SUCCESS")) newMetrics.status = "Success";
       if (log.includes("BUILD FAILURE")) newMetrics.status = "Failure";
 
@@ -66,9 +66,8 @@ export default function BuildMetrics() {
       }
     });
 
-    // console.log("📈 Updated Build Metrics:", newMetrics);
     setMetrics(newMetrics);
-  }, [logs]); // ✅ Reprocess metrics whenever logs update
+  }, [logs]);
 
   return (
     <div className="w-full max-w-4xl mx-auto p-4 bg-gray-900 text-white rounded-lg shadow-md">
