@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useSocket } from "../../hooks/useSocket";
 import Accordion from "../ui/Accordion";
-import { useMenu } from "../../store/react-context/MenuContext";
+
 import { useIsMobile } from "../../hooks/useIsMobile"; // ✅ Import the new hook
+import { closeMenu } from "@/app/store/redux-toolkit/slices/menuSlice";
+import { useAppDispatch } from "@/app/store/hooks/hooks";
 
 const pipelines = [
   { name: "Full Build", commands: ["clean", "compile", "package", "install"] },
@@ -19,14 +21,14 @@ const pipelines = [
 const MavenPipeline = () => {
   const { loading, runMavenCommand } = useSocket();
   const [runningPipeline, setRunningPipeline] = useState<string | null>(null);
-  const { toggleMenu } = useMenu();
+  const dispatch = useAppDispatch();
   const isMobile = useIsMobile(); // ✅ Use the hook
 
   const handleRunPipeline = async (pipeline: {
     name: string;
     commands: string[];
   }) => {
-    if (isMobile) toggleMenu(); // ✅ Only toggle menu on mobile/tablet
+    if (isMobile) dispatch(closeMenu());
 
     setRunningPipeline(pipeline.name);
     for (const cmd of pipeline.commands) {

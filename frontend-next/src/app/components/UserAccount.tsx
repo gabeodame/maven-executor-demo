@@ -5,18 +5,19 @@ import Login from "./Login";
 
 import { useSession, signOut } from "next-auth/react";
 import ProjectList from "./ProjectList";
-import { useMenu } from "../store/react-context/MenuContext";
+
 // import { useSessionCache } from "../store/react-context/SessionProvider";
-import { useAppDispatch } from "../store/hooks/hooks";
+import { useAppDispatch, useAppSelector } from "../store/hooks/hooks";
 import { addMavenLog } from "../store/redux-toolkit/slices/logSlice";
 import RepoList from "./RepoList";
 import { useSessionCache } from "../store/hooks/useSessionCache";
+import { toggleMenu } from "../store/redux-toolkit/slices/menuSlice";
 
 function UserAccount() {
   const { data: session, status } = useSession();
   const { sessionId: cachedSessionId, isGitHubUser } = useSessionCache();
   const [isClient, setIsClient] = useState(false); // ✅ Prevent SSR mismatch
-  const { isOpen, toggleMenu } = useMenu(); // ✅ Track menu open state
+  const { isOpen } = useAppSelector((state) => state.menu);
   const dispatch = useAppDispatch();
 
   const sessionId = session?.user?.id || cachedSessionId;

@@ -4,19 +4,24 @@ import { useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
 import Accordion from "./ui/Accordion";
 import CloneRepoForm from "./forms/CloneRepoForm";
-import Spinner from "./ui/Spinner"; // ✅ Fancy Spinner
-// import { useSessionCache } from "../store/react-context/SessionProvider";
-import { useMenu } from "../store/react-context/MenuContext";
-import { useModal } from "../store/react-context/ModalContext";
-import { useSocket } from "../hooks/useSocket";
-import { useAppDispatch } from "../store/hooks/hooks";
+import Spinner from "./ui/Spinner";
+import {} from "../store/redux-toolkit/slices/menuSlice";
+import { useAppDispatch, useAppSelector } from "../store/hooks/hooks";
 import {
   fetchProjects,
   selectProjectThunk,
   setProjects,
 } from "../store/redux-toolkit/slices/projectSlice";
+
+import { closeMenu } from "../store/redux-toolkit/slices/menuSlice";
+import {
+  closeModal,
+  openModal,
+  // selectIsModalOpen,
+} from "../store/redux-toolkit/slices/modalSlice";
+
 import { useSessionCache } from "../store/hooks/useSessionCache";
-// import { getBackEndUrl } from "../util/getbackEndUrl";
+import { useSocket } from "../hooks/useSocket";
 
 interface Repository {
   id: number;
@@ -30,14 +35,13 @@ export default function RepoList() {
   const [repos, setRepos] = useState<Repository[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
-  const [branches, setBranches] = useState<string[]>([]); // ✅ Store repo branches
+  const [branches, setBranches] = useState<string[]>([]);
+  const isMenuOpen = useAppSelector((state) => state.menu.isOpen);
+  // const isModalOpen = useAppSelector(selectIsModalOpen);
 
-  const { closeMenu } = useMenu();
-  const { isOpenModal, openModal, closeModal } = useModal();
   const { sessionId } = useSessionCache();
   const { triggerClone } = useSocket();
   const dispatch = useAppDispatch();
-  // const backendUrl = getBackEndUrl();
 
   // ✅ Fetch repositories from backend
   useEffect(() => {
@@ -94,18 +98,26 @@ export default function RepoList() {
 
   // ✅ Handle repository selection
   const handleRepoSelect = async (repo: Repository) => {
-    console.log("🚀 Opening Clone Modal");
     console.log("📦 Selected Repo:", repo);
-
     setSelectedRepo(repo);
-    setBranches([]); // ✅ Clear previous branches
+    setBranches([]);
 
-    // ✅ Fetch branches dynamically & update state
+    // ✅ Fetch branches dynamically
     const fetchedBranches = await fetchBranches(repo);
     setBranches(fetchedBranches);
 
-    closeMenu();
-    setTimeout(() => openModal(), 300);
+    // ✅ Close menu first, then open modal with a delay
+    if (isMenuOpen) {
+      console.log("📴 Closing menu before opening modal...");
+      dispatch(closeMenu());
+
+      setTimeout(() => {
+        console.log("🟢 Opening modal after menu is fully closed...");
+        dispatch(openModal());
+      }, 200); // ✅ Small delay ensures correct state updates
+    } else {
+      dispatch(openModal());
+    }
   };
 
   // ✅ Handle repository cloning
@@ -116,10 +128,11 @@ export default function RepoList() {
     repoPath?: string;
   }) => {
     if (!selectedRepo || !sessionId) return;
+    console.log("🚀 Cloning repository with form data:", formData);
 
     const { branch, projectName, pomPath, repoPath } = formData;
 
-    closeModal();
+    dispatch(closeModal()); // ✅ Close modal after submission
     try {
       await triggerClone(
         selectedRepo.clone_url,
@@ -142,7 +155,6 @@ export default function RepoList() {
           }
         });
     } catch (err) {
-      // console.error("❌ Clone failed:", err);
       toast.error(`❌ Clone failed: ${err}`);
     }
   };
@@ -153,10 +165,10 @@ export default function RepoList() {
       bgColor="bg-gray-500"
       hoverColor="hover:bg-gray-600"
     >
-      {/* ✅ Clone Repository Modal */}
+      {/* ✅ Clone Repository Modal (Redux-controlled) */}
       <CloneRepoForm
-        isOpen={isOpenModal}
-        onClose={closeModal}
+        // isOpen={isModalOpen}
+        // onClose={() => dispatch(closeModal())} // ✅ Close modal via Redux
         onClone={handleClone}
         repoName={selectedRepo?.name || ""}
         branches={branches}

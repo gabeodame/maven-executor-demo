@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development nodemon --legacy-watch --exec ts-node src/server.ts",
+    "dev": "cross-env NODE_ENV=development nodemon --watch src --ignore app/workspaces --ignore node_modules --exec ts-node src/server.ts",
     "prebuild": "npm ci",
     "build": "tsc -b",
     "start:prod": "cross-env NODE_ENV=production node dist/server.js",

@@ -1,11 +1,12 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import SocketService from "../services/SocketService";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
-import { useAppDispatch, useAppSelector } from "../store/hooks/hooks";
+import { useAppDispatch } from "../store/hooks/hooks";
 import {
   fetchProjects,
   selectProjectThunk,
+  setProjects,
 } from "../store/redux-toolkit/slices/projectSlice";
 import {
   addMavenLog,
@@ -21,17 +22,18 @@ export const useSocket = () => {
   const sessionId = session?.user?.id || cachedSessionId;
 
   const dispatch = useAppDispatch();
-  const { cloneLogs, mavenLogs } = useAppSelector((state) => state.logs);
 
-  const [socketService, setSocketService] = useState<SocketService | null>(
-    null
-  );
+  // ✅ Use refs to store persistent values across renders
+  const socketServiceRef = useRef<SocketService | null>(null);
+  const logBuffer = useRef<string[]>([]);
+  const cloneLogBuffer = useRef<string[]>([]);
+  const unsubscribeCloneLogsRef = useRef<(() => void) | null>(null);
+  const logTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const cloneLogTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const [loading, setLoading] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState(false);
   const [commandCompleted, setCommandCompleted] = useState(false);
-  const [unsubscribeCloneLogs, setUnsubscribeCloneLogs] = useState<
-    (() => void) | null
-  >(null);
 
   // ✅ Initialize WebSocket Connection
   useEffect(() => {
@@ -42,41 +44,60 @@ export const useSocket = () => {
 
     console.log("🔌 useSocket: Initializing WebSocket for session:", sessionId);
     const newSocketService = SocketService.getInstance(sessionId);
-    setSocketService(newSocketService);
+    socketServiceRef.current = newSocketService;
     setIsConnected(true);
 
-    // ✅ Subscribe to Maven logs
-    const unsubscribeMaven = newSocketService.subscribe(
+    // ✅ Maven Logs Subscription (Efficient batching)
+    const unsubscribeMavenLogs = newSocketService.subscribe(
       (newLogs, isLoading) => {
-        newLogs.forEach((log) => dispatch(addMavenLog(log)));
+        logBuffer.current.push(...newLogs);
+
+        if (!logTimeoutRef.current) {
+          logTimeoutRef.current = setTimeout(() => {
+            if (logBuffer.current.length > 0) {
+              dispatch(addMavenLog(logBuffer.current.join("\n")));
+              logBuffer.current = [];
+            }
+            logTimeoutRef.current = null;
+          }, 300); // ✅ Reduce Redux updates with debounce
+        }
+
         setLoading(isLoading);
         if (!isLoading) setCommandCompleted((prev) => !prev);
       }
     );
 
-    // ✅ Subscribe to Clone logs (only once)
-    const unsubscribeClone = newSocketService.subscribeCloneLogs((newLogs) => {
-      newLogs.forEach((log) => dispatch(addCloneLog(log)));
-    });
+    // ✅ Clone Logs Subscription (Efficient batching)
+    unsubscribeCloneLogsRef.current = newSocketService.subscribeCloneLogs(
+      (newLogs) => {
+        cloneLogBuffer.current.push(...newLogs);
 
-    setUnsubscribeCloneLogs(() => unsubscribeClone);
+        if (!cloneLogTimeoutRef.current) {
+          cloneLogTimeoutRef.current = setTimeout(() => {
+            if (cloneLogBuffer.current.length > 0) {
+              dispatch(addCloneLog(cloneLogBuffer.current.join("\n")));
+              cloneLogBuffer.current = [];
+            }
+            cloneLogTimeoutRef.current = null;
+          }, 500); // ✅ Reduce Redux updates with debounce
+        }
+      }
+    );
 
-    // ✅ Listen for Clone Completion
+    // ✅ Clone Status Subscription
     const unsubscribeCloneStatus = newSocketService.subscribeCloneStatus(
       (status) => {
         console.log("📡 [Clone Status Update]", status);
-
         if (status.success) {
           toast.success("✅ Repository cloned successfully!");
 
-          // ✅ Fetch updated projects and select the newly cloned one
           dispatch(fetchProjects(sessionId))
             .unwrap()
             .then((projects) => {
               if (projects.length > 0) {
-                const latestProject = projects[projects.length - 1]; // ✅ Select last project (newly cloned)
+                const latestProject = projects.at(-1);
                 dispatch(
-                  selectProjectThunk({ sessionId, project: latestProject })
+                  selectProjectThunk({ sessionId, project: latestProject! })
                 );
               }
             })
@@ -100,11 +121,13 @@ export const useSocket = () => {
         "🔌 useSocket: Cleaning up WebSocket for session:",
         sessionId
       );
-      unsubscribeMaven();
-      unsubscribeClone();
-      unsubscribeCloneStatus();
+
+      unsubscribeMavenLogs();
+      unsubscribeCloneLogsRef.current?.(); // ✅ Cleanup clone logs subscription
+      unsubscribeCloneStatus(); // ✅ Cleanup clone status subscription
       newSocketService.getSocket()?.off("clear-clone-logs"); // ✅ Cleanup event listener
-      setSocketService(null);
+
+      socketServiceRef.current = null;
       setIsConnected(false);
     };
   }, [sessionId, dispatch]);
@@ -112,6 +135,7 @@ export const useSocket = () => {
   // ✅ Run Maven Commands (Pipeline & Normal)
   const runMavenCommand = useCallback(
     (cmd: string, type?: "pipeline" | "normal") => {
+      const socketService = socketServiceRef.current;
       if (!socketService || !isConnected) {
         console.warn(
           "⚠️ useSocket: Cannot send command, WebSocket is not connected."
@@ -128,12 +152,10 @@ export const useSocket = () => {
         return;
       }
 
-      if (type === "pipeline") {
-        if (socketService.isFirstPipelineRun()) {
-          dispatch(clearMavenLogs());
-          socketService.clearLogs();
-          socketService.resetPipelineState();
-        }
+      if (type === "pipeline" && socketService.isFirstPipelineRun()) {
+        dispatch(clearMavenLogs());
+        socketService.clearLogs();
+        socketService.resetPipelineState();
       } else {
         dispatch(clearMavenLogs());
         dispatch(clearCloneLogs());
@@ -145,7 +167,7 @@ export const useSocket = () => {
       setCommandCompleted(false);
       socketService.runMavenCommand(cmd, type);
     },
-    [socketService, isConnected, loading, dispatch]
+    [isConnected, loading, dispatch]
   );
 
   // ✅ Clone Repository via WebSocket
@@ -157,6 +179,7 @@ export const useSocket = () => {
       repoPath?: string,
       pomPath?: string
     ): Promise<void> => {
+      const socketService = socketServiceRef.current;
       if (!socketService || !isConnected) {
         console.warn(
           "⚠️ useSocket: Cannot send clone request, WebSocket is not connected."
@@ -166,38 +189,57 @@ export const useSocket = () => {
 
       console.log(`▶️ [CLIENT] Cloning: ${repoUrl} | Branch: ${branch}`);
 
-      dispatch(clearCloneLogs()); // ✅ Ensure logs are cleared before cloning starts
+      dispatch(clearCloneLogs()); // ✅ Clear logs before cloning
       dispatch(clearMavenLogs()); // ✅ Clear Maven logs as well
+
       return new Promise<void>((resolve, reject) => {
         let hasCompleted = false;
 
-        const handleCloneLog = (log: string) => {
-          console.log("📡 [Clone Log]", log);
-          dispatch(addCloneLog(log));
+        const handleCloneStatus = (data: {
+          success: boolean;
+          repoPath?: string;
+          error?: string;
+        }) => {
+          if (hasCompleted) return; // ✅ Prevent duplicate execution
+          hasCompleted = true; // ✅ Ensure it runs only once
 
-          if (!hasCompleted) {
-            if (log.includes("✅ Repository cloned successfully")) {
-              console.log("🎉 Clone successful!");
-              hasCompleted = true;
-              resolve();
-            } else if (log.includes("❌ ERROR")) {
-              console.error("❌ Clone failed!", log);
-              hasCompleted = true;
-              reject(new Error(log));
+          if (data.success && data.repoPath) {
+            console.log("🎉 Clone successful! Repo Path:", data.repoPath);
+
+            if (sessionId) {
+              console.log("🔄 Fetching updated projects...");
+              dispatch(fetchProjects(sessionId))
+                .unwrap()
+                .then((updatedProjects) => {
+                  dispatch(setProjects(updatedProjects));
+
+                  const newProject = projectName || updatedProjects.at(-1);
+                  if (newProject) {
+                    dispatch(
+                      selectProjectThunk({ sessionId, project: newProject })
+                    );
+                  }
+                })
+                .catch((err) => {
+                  console.error("❌ Failed to fetch updated projects:", err);
+                  toast.error(`❌ Failed to update project list: ${err}`);
+                });
             }
+
+            resolve();
+          } else {
+            console.error("❌ Clone failed!", data.error);
+            toast.error(`❌ Clone failed: ${data.error}`);
+            reject(new Error(data.error || "Unknown clone error"));
           }
         };
 
-        if (unsubscribeCloneLogs) {
-          unsubscribeCloneLogs();
-        }
+        // ✅ Unsubscribe from previous event listeners to prevent duplication
+        unsubscribeCloneLogsRef.current?.();
+        unsubscribeCloneLogsRef.current =
+          socketService.subscribeCloneStatus(handleCloneStatus);
 
-        const unsubscribe = socketService.subscribeCloneLogs((newLogs) => {
-          newLogs.forEach(handleCloneLog);
-        });
-
-        setUnsubscribeCloneLogs(() => unsubscribe);
-
+        // ✅ Emit the clone request
         socketService.triggerCloneRepo(
           repoUrl,
           branch,
@@ -205,20 +247,12 @@ export const useSocket = () => {
           repoPath,
           pomPath
         );
-
-        setTimeout(() => {
-          if (!hasCompleted) {
-            console.warn("⏳ Clone operation timed out.");
-          }
-        }, 30000);
       });
     },
-    [socketService, isConnected, dispatch, unsubscribeCloneLogs]
+    [isConnected, dispatch, sessionId]
   );
 
   return {
-    mavenLogs,
-    cloneLogs,
     loading,
     isConnected,
     runMavenCommand,

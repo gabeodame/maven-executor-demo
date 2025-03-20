@@ -2,7 +2,7 @@ import { createSlice, PayloadAction, createAsyncThunk } from "@reduxjs/toolkit";
 import { getBackEndUrl } from "@/app/util/getbackEndUrl";
 import axios, { AxiosError } from "axios";
 import { RootState, AppDispatch } from "../store";
-import SocketService from "@/app/services/SocketService"; // ✅ Correct import
+import SocketService from "@/app/services/SocketService";
 
 // ✅ Interface for Delete Response
 interface DeleteProjectResponse {
@@ -22,45 +22,57 @@ interface ProjectState {
   selectedProject: string | null;
   loading: boolean;
   error: string | null;
+  lastUpdated: number; // ✅ Prevent redundant fetches
 }
 
 // ✅ Initial State
 const initialState: ProjectState = {
   projects: [],
-  selectedProject: null, // ✅ Avoid accessing localStorage (SSR-safe)
+  selectedProject: null,
   loading: false,
   error: null,
+  lastUpdated: 0,
 };
 
-// ✅ Fetch Projects from Backend
+// ✅ Fetch Projects (Prevent redundant API calls)
 export const fetchProjects = createAsyncThunk<
-  string[], // ✅ Return Type
-  string, // ✅ Argument Type (sessionId)
-  { rejectValue: string }
->("projects/fetchProjects", async (sessionId, { rejectWithValue }) => {
-  if (!sessionId) return rejectWithValue("Session ID missing");
+  string[],
+  string,
+  { state: RootState; rejectValue: string }
+>(
+  "projects/fetchProjects",
+  async (sessionId, { getState, rejectWithValue }) => {
+    if (!sessionId) return rejectWithValue("Session ID missing");
 
-  try {
-    const response = await axios.get<string[]>(
-      `${getBackEndUrl()}/api/user-projects`,
-      {
-        headers: { "x-session-id": sessionId },
-        withCredentials: true,
-      }
-    );
+    const state = getState().projects;
+    const now = Date.now();
 
-    console.log("✅ Fetched projects:", response.data);
-    return response.data;
-  } catch (error) {
-    console.error("❌ Error fetching projects:", error);
-    return rejectWithValue("Failed to fetch projects");
+    if (now - state.lastUpdated < 5000) {
+      console.warn("⏳ Skipping duplicate fetchProjects call...");
+      return state.projects;
+    }
+
+    try {
+      const response = await axios.get<string[]>(
+        `${getBackEndUrl()}/api/user-projects`,
+        {
+          headers: { "x-session-id": sessionId },
+          withCredentials: true,
+        }
+      );
+      console.log("✅ Fetched projects:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Error fetching projects:", error);
+      return rejectWithValue("Failed to fetch projects");
+    }
   }
-});
+);
 
-// ✅ Select Project (Updates Backend & Local State)
+// ✅ Select Project
 export const selectProjectThunk = createAsyncThunk<
-  string, // ✅ Return Type (project name)
-  { sessionId: string; project: string }, // ✅ Argument Type
+  string,
+  { sessionId: string; project: string },
   { rejectValue: string }
 >(
   "projects/selectProject",
@@ -74,11 +86,10 @@ export const selectProjectThunk = createAsyncThunk<
           withCredentials: true,
         }
       );
-
-      localStorage.setItem("selectedProject", project); // ✅ Ensure local persistence
+      localStorage.setItem("selectedProject", project);
       return project;
     } catch (error) {
-      console.error("❌ Error selecting project:", error);
+      console.warn("❌ Error selecting project:", error);
       return rejectWithValue("Failed to select project");
     }
   }
@@ -86,9 +97,9 @@ export const selectProjectThunk = createAsyncThunk<
 
 // ✅ Delete Project
 export const deleteProjectThunk = createAsyncThunk<
-  string, // ✅ Return Type (deleted project name)
-  { sessionId: string; project: string }, // ✅ Argument Type
-  { rejectValue: string } // ✅ Reject must return a string to match `state.error`
+  string,
+  { sessionId: string; project: string },
+  { rejectValue: string }
 >(
   "projects/deleteProject",
   async ({ sessionId, project }, { rejectWithValue }) => {
@@ -96,18 +107,17 @@ export const deleteProjectThunk = createAsyncThunk<
       const response = await axios.delete<DeleteProjectResponse>(
         `${getBackEndUrl()}/api/delete-project`,
         {
-          data: { projectName: project }, // ✅ Backend expects `projectName`
+          data: { projectName: project },
           headers: { "x-session-id": sessionId },
         }
       );
-
       if (response.data.success) {
         console.log(`🗑️ Project deleted successfully: ${project}`);
         return project;
       } else {
         return rejectWithValue(response.data.message || "Unknown error");
       }
-    } catch (error: unknown) {
+    } catch (error) {
       if (axios.isAxiosError(error)) {
         const axiosError = error as AxiosError<DeleteProjectError>;
         return rejectWithValue(
@@ -127,30 +137,36 @@ export const handleCloneCompletion = (
   const sessionId = getState().session.sessionId;
   if (!sessionId) return;
 
-  const socketService = SocketService.getInstance(sessionId); // ✅ Ensure correct instance
+  const socketService = SocketService.getInstance(sessionId);
+  socketService.getSocket()?.off("repo-clone-status"); // Cleanup previous listener
 
   socketService.subscribeCloneStatus(
     async (data: { success: boolean; repoPath?: string; error?: string }) => {
-      if (data.success && data.repoPath) {
-        console.log("✅ Clone success. Repo Path:", data.repoPath);
-
-        dispatch(fetchProjects(sessionId))
-          .unwrap()
-          .then((updatedProjects: string[]) => {
-            const newProject = updatedProjects.find((p) =>
-              data.repoPath?.includes(p)
-            );
-
-            if (newProject) {
-              dispatch(selectProjectThunk({ sessionId, project: newProject }));
-            }
-          })
-          .catch((fetchError) => {
-            console.error("❌ Error fetching updated projects:", fetchError);
-          });
-      } else {
+      if (!data.success) {
         console.error("❌ Clone failed:", data.error);
+        return; // ✅ Exit early if the clone process failed
       }
+
+      if (!data.repoPath) {
+        console.warn("⚠️ Clone success but no valid repo path received.");
+        return;
+      }
+
+      console.log("✅ Clone success. Repo Path:", data.repoPath);
+
+      dispatch(fetchProjects(sessionId))
+        .unwrap()
+        .then((updatedProjects: string[]) => {
+          const newProject = updatedProjects.find((p) =>
+            data.repoPath?.includes(p)
+          );
+          if (newProject) {
+            dispatch(selectProjectThunk({ sessionId, project: newProject }));
+          }
+        })
+        .catch((fetchError) => {
+          console.error("❌ Error fetching updated projects:", fetchError);
+        });
     }
   );
 };
@@ -161,17 +177,14 @@ const projectSlice = createSlice({
   initialState,
   reducers: {
     setProjects: (state, action: PayloadAction<string[]>) => {
-      state.projects = action.payload;
-
-      // ✅ Preserve user selection if already set
-      if (!state.selectedProject && action.payload.length > 0) {
-        state.selectedProject = action.payload[0];
+      if (JSON.stringify(state.projects) !== JSON.stringify(action.payload)) {
+        state.projects = [...action.payload];
+        state.lastUpdated = Date.now();
       }
     },
   },
   extraReducers: (builder) => {
     builder
-      // ✅ Fetch Projects
       .addCase(fetchProjects.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -179,6 +192,7 @@ const projectSlice = createSlice({
       .addCase(fetchProjects.fulfilled, (state, action) => {
         state.loading = false;
         state.projects = action.payload;
+        state.lastUpdated = Date.now();
         if (!state.selectedProject && action.payload.length > 0) {
           state.selectedProject = action.payload[0];
         }
@@ -187,8 +201,6 @@ const projectSlice = createSlice({
         state.loading = false;
         state.error = action.payload ?? "Unknown error";
       })
-
-      // ✅ Select Project
       .addCase(selectProjectThunk.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -201,9 +213,6 @@ const projectSlice = createSlice({
         state.loading = false;
         state.error = action.payload ?? "Unknown error";
       })
-
-      // ✅ Delete Project
-      // ✅ Delete Project
       .addCase(deleteProjectThunk.pending, (state) => {
         state.loading = true;
         state.error = null;

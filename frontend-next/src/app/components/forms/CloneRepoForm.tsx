@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import * as yup from "yup";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -15,10 +15,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAppDispatch, useAppSelector } from "@/app/store/hooks/hooks";
+import { closeMenu } from "@/app/store/redux-toolkit/slices/menuSlice";
+import {
+  closeModal,
+  selectIsModalOpen,
+} from "@/app/store/redux-toolkit/slices/modalSlice";
 
 interface CloneRepoFormProps {
-  isOpen: boolean;
-  onClose: () => void;
   onClone: (formData: CloneRepoFormData) => void;
   repoName: string;
   branches: string[];
@@ -39,13 +43,11 @@ const cloneRepoSchema = yup.object().shape({
   repoPath: yup.string().optional(),
 });
 
-const CloneRepoForm = ({
-  isOpen,
-  onClose,
-  onClone,
-  repoName,
-  branches,
-}: CloneRepoFormProps) => {
+const CloneRepoForm = ({ onClone, repoName, branches }: CloneRepoFormProps) => {
+  const dispatch = useAppDispatch();
+  const isOpen = useAppSelector(selectIsModalOpen);
+  const latestRepoName = useRef(repoName); // ✅ Track latest repo name
+
   const {
     register,
     handleSubmit,
@@ -55,20 +57,40 @@ const CloneRepoForm = ({
     resolver: yupResolver(cloneRepoSchema),
   });
 
-  // ✅ Prefill form fields when the modal opens
+  // ✅ Ensure Form Resets on Repo Selection (Only when modal opens)
   useEffect(() => {
-    if (repoName) {
+    if (isOpen) {
+      latestRepoName.current = repoName; // ✅ Store latest repo name
+      console.log("🔄 Resetting form with repo:", latestRepoName.current);
+
       reset({
         branch: branches.includes("main") ? "main" : branches[0] || "",
-        projectName: repoName, // ✅ Prefill project name with repoName
+        projectName: latestRepoName.current, // ✅ Ensure repo name is correct
         pomPath: "",
         repoPath: "",
       });
     }
-  }, [repoName, branches, reset]);
+  }, [repoName, branches, reset, isOpen]);
+  // ✅ Close Modal and Ensure Redux State Updates
+  const handleClose = () => {
+    dispatch(closeMenu()); // ✅ Ensure menu closes first
+    dispatch(closeModal()); // ✅ Close the modal properly
+  };
+
+  // ✅ Fix: Prevent default event issues on mobile
+  const handleSubmitForm = (data: CloneRepoFormData) => {
+    console.log("🛠️ Submitting Clone Form: ", data);
+
+    onClone(data); // ✅ Ensure `handleClone` executes before closing modal
+
+    setTimeout(() => {
+      dispatch(closeMenu()); // ✅ Close menu first
+      dispatch(closeModal()); // ✅ Then close modal
+    }, 100); // ✅ Small delay ensures `onClone` runs first
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="bg-gray-900 text-white border border-gray-700 shadow-xl">
         <DialogHeader>
           <DialogTitle>
@@ -77,7 +99,10 @@ const CloneRepoForm = ({
         </DialogHeader>
 
         {/* ✅ Form Submission */}
-        <form onSubmit={handleSubmit(onClone)} className="space-y-4">
+        <form
+          onSubmit={handleSubmit(handleSubmitForm)} // ✅ Fix: Ensure function is wrapped
+          className="space-y-4"
+        >
           {/* 🔹 Branch Selection */}
           <div className="flex flex-col gap-2">
             <Label htmlFor="branch">Branch</Label>
@@ -134,7 +159,7 @@ const CloneRepoForm = ({
             >
               🔂 Clone Repo
             </Button>
-            <Button type="button" onClick={onClose} variant="destructive">
+            <Button type="button" onClick={handleClose} variant="destructive">
               Cancel
             </Button>
           </DialogFooter>

@@ -5,5 +5,7 @@
     "moduleResolution": "node",
     "esModuleInterop": true,
     "strict": true
-  }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "app/workspaces"]
 }

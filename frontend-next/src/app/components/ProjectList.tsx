@@ -1,10 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import Accordion from "./ui/Accordion";
 import ProjectItem from "./ProjectItem";
-// import { useSessionCache } from "../store/react-context/SessionProvider";
-// import { toast } from "sonner";
 import { useAppSelector, useAppDispatch } from "../store/hooks/hooks";
 import {
   fetchProjects,
@@ -20,14 +18,22 @@ function ProjectList() {
   const { projects, selectedProject } = useAppSelector(
     (state) => state.projects
   );
-  const hasFetched = useRef(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    if (!sessionId || hasFetched.current) return;
-
+    if (!sessionId) return;
     dispatch(fetchProjects(sessionId));
-    hasFetched.current = true;
   }, [dispatch, sessionId]);
+
+  // ✅ Manually refresh projects
+  const handleRefresh = () => {
+    if (!sessionId) return;
+    setIsRefreshing(true);
+    dispatch(fetchProjects(sessionId))
+      .unwrap()
+      .catch(() => toast.error("❌ Failed to refresh project list."))
+      .finally(() => setIsRefreshing(false));
+  };
 
   const handleSelectProject = (project: string) => {
     if (sessionId && project !== selectedProject) {
@@ -47,7 +53,9 @@ function ProjectList() {
   };
 
   return (
-    <Accordion title="Project List">
+    <Accordion title={Trigger({ isRefreshing, handleRefresh })}>
+      <div className="flex justify-between items-center mb-2"></div>
+
       {projects.length > 0 ? (
         <div className="space-y-2">
           {projects.map((project, index) => (
@@ -69,3 +77,29 @@ function ProjectList() {
 }
 
 export default ProjectList;
+
+type TriggerProps = {
+  isRefreshing: boolean;
+  handleRefresh: () => void;
+};
+
+const Trigger = ({ isRefreshing, handleRefresh }: TriggerProps) => {
+  return (
+    <div
+      onClick={(e: React.MouseEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+        handleRefresh();
+      }}
+      // disabled={isRefreshing}
+      className="w-full text-white px-4 py-2 rounded-md disabled:bg-gray-600 transition"
+    >
+      {isRefreshing ? (
+        "🔄 Refreshing..."
+      ) : (
+        <div className="w-full flex items-center justify-between">
+          <span>Project List</span> <span>🔄</span>
+        </div>
+      )}
+    </div>
+  );
+};

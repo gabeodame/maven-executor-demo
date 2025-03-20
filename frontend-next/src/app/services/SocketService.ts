@@ -1,8 +1,6 @@
 import { io, Socket } from "socket.io-client";
 import { getBackEndUrl } from "../util/getbackEndUrl";
-
 import { store } from "../store/redux-toolkit/store";
-
 import {
   cloneFailure,
   cloneSuccess,
@@ -10,18 +8,24 @@ import {
 import {
   addCloneLog,
   addMavenLog,
+  clearCloneLogs,
+  clearMavenLogs,
 } from "../store/redux-toolkit/slices/logSlice";
 
 class SocketService {
   private static instance: SocketService | null = null;
   private socket: Socket;
   private sessionId: string;
-  private mavenLogs: string[] = [];
-  private cloneLogs: string[] = [];
   private loading = false;
+  private isFirstPipelineCommand = true;
   private subscribers: ((logs: string[], loading: boolean) => void)[] = [];
   private cloneSubscribers: ((logs: string[]) => void)[] = [];
-  private isFirstPipelineCommand = true;
+
+  private logBuffer: string[] = [];
+  private cloneLogBuffer: string[] = [];
+  private logTimeout: NodeJS.Timeout | null = null;
+  private cloneLogTimeout: NodeJS.Timeout | null = null;
+  private hasAttachedListeners = false;
 
   private constructor(sessionId: string) {
     this.sessionId = sessionId;
@@ -35,68 +39,96 @@ class SocketService {
       auth: { sessionId },
     });
 
-    this.socket.on("connect", () => console.log("✅ WebSocket connected"));
-    this.socket.on("disconnect", () =>
-      console.log("❌ WebSocket disconnected")
-    );
+    this.setupEventListeners();
+  }
 
-    // ✅ Avoid multiple event registrations
-    this.socket.removeAllListeners("maven-output");
-    this.socket.removeAllListeners("clone-log");
+  private setupEventListeners() {
+    if (this.hasAttachedListeners) return;
+    this.hasAttachedListeners = true;
 
-    // ✅ Listen for Maven logs
+    this.socket.on("connect", () => {
+      console.log("✅ WebSocket connected");
+    });
+
+    this.socket.on("disconnect", () => {
+      console.log("❌ WebSocket disconnected");
+    });
+
+    // ✅ Listen for Maven logs (Direct Dispatch)
     this.socket.on("maven-output", (data: string) => {
       console.log(`📡 [WebSocket] Maven Output: ${data}`);
-      // this.mavenLogs.push(data);
+
+      // ✅ Dispatch log immediately to Redux (avoid buffer)
       store.dispatch(addMavenLog(data));
 
       if (data.includes("BUILD SUCCESS") || data.includes("BUILD FAILURE")) {
         this.setLoading(false);
       }
-
-      this.notifySubscribers();
     });
 
-    // ✅ Listen for Clone logs (Structured Jenkins-style)
+    // ✅ Listen for Clone logs (Direct Dispatch)
     this.socket.on("clone-log", (data: string) => {
+      // ✅ Prevent logging false success messages
+      if (
+        data.includes("✅ Repository cloned successfully") &&
+        data.includes("null")
+      ) {
+        console.warn("⚠️ Ignoring misleading success log.");
+        return; // ✅ Skip this misleading log
+      }
+
       const formattedLog = `[CLONE] ${new Date().toLocaleTimeString()} ➜ ${data}`;
       console.log(`📡 [WebSocket] Clone Log: ${formattedLog}`);
-      // this.cloneLogs.push(formattedLog);
+
       store.dispatch(addCloneLog(formattedLog));
-      // if (data.includes("✅ Repository cloned successfully")) {
-      //   store.dispatch(cloneSuccess());
-      // } else if (data.includes("❌ ERROR")) {
-      //   store.dispatch(cloneFailure(data));
-      // }
-      this.notifyCloneSubscribers();
     });
 
     // ✅ Listen for Clone Status updates
-    this.socket.on(
-      "repo-clone-status",
-      (data: { success: boolean; repoPath?: string; error?: string }) => {
-        if (data.success) {
-          console.log(
-            `🎉 Clone completed successfully. Repo Path: ${data.repoPath}`
-          );
-          store.dispatch(
-            data.success
-              ? cloneSuccess()
-              : cloneFailure(data.error || "Unknown error")
-          );
-        } else {
-          console.error(`❌ Clone failed: ${data.error}`);
-          this.cloneLogs.push(`❌ Clone failed: ${data.error}`);
-        }
-
-        this.notifyCloneSubscribers();
+    this.socket.on("repo-clone-status", (data) => {
+      console.log(`📡 [WebSocket] Clone Status: ${JSON.stringify(data)}`);
+      if (!data.success || !data.repoPath) {
+        console.error(`❌ Clone failed: ${data.error}`);
+        store.dispatch(cloneFailure(data.error || "Unknown error"));
+        return; // ✅ Exit early on failure
       }
+
+      console.log(
+        `🎉 Clone completed successfully. Repo Path: ${data.repoPath}`
+      );
+      store.dispatch(cloneSuccess());
+    });
+  }
+
+  private setLoading(state: boolean) {
+    if (this.loading !== state) {
+      this.loading = state;
+      this.notifySubscribers();
+    }
+  }
+
+  public notifySubscribers() {
+    this.subscribers.forEach((callback) =>
+      callback([...this.logBuffer], this.loading)
     );
+  }
+
+  public notifyCloneSubscribers() {
+    this.cloneSubscribers.forEach((callback) =>
+      callback([...this.cloneLogBuffer])
+    );
+  }
+
+  public static getInstance(sessionId: string): SocketService {
+    if (!this.instance || this.instance.sessionId !== sessionId) {
+      this.instance = new SocketService(sessionId);
+    }
+    return this.instance;
   }
 
   public getSocket(): Socket | null {
     return this.socket;
   }
+
   public isFirstPipelineRun(): boolean {
     return this.isFirstPipelineCommand;
   }
@@ -105,19 +137,11 @@ class SocketService {
     this.isFirstPipelineCommand = true;
   }
 
-  // ✅ Singleton pattern: Ensures only one instance per session
-  public static getInstance(sessionId: string): SocketService {
-    if (!this.instance || this.instance.sessionId !== sessionId) {
-      this.instance = new SocketService(sessionId);
-    }
-    return this.instance;
-  }
-
   public subscribe(
     callback: (logs: string[], loading: boolean) => void
   ): () => void {
     this.subscribers.push(callback);
-    callback([...this.mavenLogs], this.loading);
+    callback([...this.logBuffer], this.loading);
     return () => {
       this.subscribers = this.subscribers.filter((sub) => sub !== callback);
     };
@@ -125,7 +149,7 @@ class SocketService {
 
   public subscribeCloneLogs(callback: (logs: string[]) => void): () => void {
     this.cloneSubscribers.push(callback);
-    callback([...this.cloneLogs]);
+    callback([...this.cloneLogBuffer]);
     return () => {
       this.cloneSubscribers = this.cloneSubscribers.filter(
         (sub) => sub !== callback
@@ -133,72 +157,16 @@ class SocketService {
     };
   }
 
-  public clearLogs() {
-    console.log("⚙️ Clearing Maven logs...");
-    this.mavenLogs = [];
-    this.notifySubscribers();
-  }
-
-  public clearCloneLogs() {
-    console.log("⚙️ Clearing Clone logs...");
-    this.cloneLogs = [];
-    this.notifyCloneSubscribers();
-  }
-
-  private notifySubscribers() {
-    this.subscribers.forEach((callback) =>
-      callback([...this.mavenLogs], this.loading)
-    );
-  }
-
-  private notifyCloneSubscribers() {
-    this.cloneSubscribers.forEach((callback) => callback([...this.cloneLogs]));
-  }
-
-  private setLoading(state: boolean) {
-    this.loading = state;
-    this.notifySubscribers();
-  }
-
-  // ✅ Execute Maven Command
-  public runMavenCommand(command: string, type?: "pipeline" | "normal") {
-    console.log(`🔧 Running Maven Command: ${command}`);
-
-    if (!this.sessionId) {
-      console.error("❌ ERROR: No session ID available!");
-      return;
-    }
-    if (this.loading) {
-      console.warn(
-        "⏳ Skipping duplicate command execution, still processing..."
-      );
-      return;
-    }
-
-    // ✅ Always clear logs for a fresh start unless in a pipeline sequence
-    if (type === "pipeline") {
-      if (this.isFirstPipelineCommand) {
-        this.clearLogs();
-        this.isFirstPipelineCommand = false;
-      }
-    } else {
-      this.clearLogs();
-      this.clearCloneLogs();
-      this.isFirstPipelineCommand = true;
-    }
-    store.dispatch(addMavenLog(`▶️ [CLIENT] Sending command: mvn ${command}`));
-    // this.mavenLogs.push(`▶️ [CLIENT] Sending command: mvn ${command}`);
-    this.setLoading(true);
-    this.socket.emit("run-maven-command", command);
-  }
-
   public subscribeCloneStatus(
-    callback: (status: {
+    callback: (data: {
       success: boolean;
       repoPath?: string;
       error?: string;
     }) => void
   ): () => void {
+    // ✅ Remove existing event listener before adding a new one
+    this.socket.off("repo-clone-status");
+
     const handler = (data: {
       success: boolean;
       repoPath?: string;
@@ -214,7 +182,20 @@ class SocketService {
     };
   }
 
-  // ✅ Clone Repository via WebSocket (Jenkins-style logs)
+  public clearLogs() {
+    console.log("⚙️ Clearing Maven logs...");
+    this.logBuffer = [];
+    store.dispatch(clearMavenLogs());
+    this.notifySubscribers();
+  }
+
+  public clearCloneLogs() {
+    console.log("⚙️ Clearing Clone logs...");
+    this.cloneLogBuffer = [];
+    store.dispatch(clearCloneLogs());
+    this.notifyCloneSubscribers();
+  }
+
   public triggerCloneRepo(
     repoUrl: string,
     branch: string,
@@ -222,11 +203,6 @@ class SocketService {
     repoPath?: string,
     pomPath?: string
   ) {
-    if (!this.socket) {
-      console.error("❌ ERROR: WebSocket instance is missing!");
-      return;
-    }
-
     if (!this.socket.connected) {
       console.error(
         "⚠️ WebSocket is not connected. Cannot emit clone request."
@@ -234,32 +210,14 @@ class SocketService {
       return;
     }
 
-    console.log(
-      `▶️ [CLIENT] Cloning repository: ${repoUrl} on branch: ${branch}`
-    );
+    console.log(`▶️ [CLIENT] Cloning: ${repoUrl} | Branch: ${branch}`);
 
-    this.clearCloneLogs(); // ✅ Clears previous logs before starting
+    if (!this.loading) {
+      this.clearCloneLogs();
+    }
 
-    // ✅ Structured log output (Jenkins-style)
     store.dispatch(addCloneLog(`🛠️ Cloning repository: ${repoUrl}`));
     store.dispatch(addCloneLog(`🔄 Checking out branch: ${branch}`));
-    store.dispatch(
-      addCloneLog(
-        `📌 Git Command: git clone --branch ${branch} --depth=1 ${repoUrl}`
-      )
-    );
-
-    if (repoPath) {
-      store.dispatch(addCloneLog(`📂 Target Subdirectory: ${repoPath}`));
-    }
-
-    if (pomPath) {
-      store.dispatch(addCloneLog(`📄 Custom pom.xml Path: ${pomPath}`));
-    }
-
-    this.notifyCloneSubscribers(); // ✅ Notifies UI of initial clone logs
-
-    // ✅ Send WebSocket event to backend
     this.socket.emit("clone-repo", {
       repoUrl,
       branch,
@@ -267,10 +225,35 @@ class SocketService {
       repoPath,
       pomPath,
     });
-
-    // ✅ Add final pending log to indicate process is ongoing
     store.dispatch(addMavenLog("⏳ Cloning in progress..."));
-    this.notifyCloneSubscribers();
+  }
+
+  public runMavenCommand(command: string, type?: "pipeline" | "normal") {
+    console.log(`🔧 Running Maven Command: ${command}`);
+
+    if (!this.sessionId) {
+      console.error("❌ ERROR: No session ID available!");
+      return;
+    }
+    if (this.loading) {
+      console.warn(
+        "⏳ Skipping duplicate command execution, still processing..."
+      );
+      return;
+    }
+
+    if (type === "pipeline" && this.isFirstPipelineCommand) {
+      this.clearLogs();
+      this.isFirstPipelineCommand = false;
+    } else {
+      this.clearLogs();
+      this.clearCloneLogs();
+      this.isFirstPipelineCommand = true;
+    }
+
+    store.dispatch(addMavenLog(`▶️ [CLIENT] Sending command: mvn ${command}`));
+    this.setLoading(true);
+    this.socket.emit("run-maven-command", command);
   }
 }
 

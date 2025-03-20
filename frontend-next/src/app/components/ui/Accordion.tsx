@@ -72,7 +72,7 @@ const Accordion = forwardRef<AccordionHandle, AccordionProps>(
               open: { color: "rgb(147, 197, 253)" },
               closed: { color: "rgb(255, 255, 255)" },
             }}
-            className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-left"
+            className="w-full bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-left"
           >
             {title}
           </motion.span>

@@ -1,14 +1,43 @@
 import { Request, Response } from "express";
+import { Server, Socket } from "socket.io";
 import { setJavaProjectPath } from "../config/projectPaths";
 import fs from "fs";
 import path from "path";
-import { Server, Socket } from "socket.io";
-import { execSync } from "child_process";
+import { spawn } from "child_process";
+
+/**
+ * ✅ Logs messages to both console and WebSocket.
+ */
+const sendLog = (socket: Socket, msg: string, clearLogs: boolean = false) => {
+  if (clearLogs) {
+    socket.emit("clear-clone-logs"); // Clear logs on frontend UI
+  }
+  console.log(`[Backend] ${msg}`);
+  socket.emit("clone-log", msg);
+};
+
+/**
+ * ✅ Checks workspace for valid projects in a session.
+ * - Returns a list of valid projects that contain `pom.xml`.
+ */
+export const checkWorkspaceProjects = (sessionId: string): string[] => {
+  const userWorkspace = `/app/workspaces/${sessionId}`;
+  if (!fs.existsSync(userWorkspace)) return [];
+
+  return fs
+    .readdirSync(userWorkspace, { withFileTypes: true })
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => {
+      const projectPath = path.join(userWorkspace, dirent.name);
+      return fs.existsSync(path.join(projectPath, "pom.xml"))
+        ? dirent.name
+        : null;
+    })
+    .filter(Boolean) as string[];
+};
 
 /**
  * ✅ Handles setting the repository path for a session.
- * - Ensures the `repoPath` exists before setting.
- * - Stores the session path for debugging.
  */
 export const handleSetRepoPath = (req: Request, res: Response) => {
   const sessionId = req.headers["x-session-id"] as string;
@@ -16,39 +45,26 @@ export const handleSetRepoPath = (req: Request, res: Response) => {
 
   console.log(`🔍 Received repo path update request for session: ${sessionId}`);
 
-  if (!sessionId) {
-    console.log("❌ ERROR: No session ID provided!");
-    return res.status(400).json({ error: "Session ID is required" });
+  if (!sessionId || !repoPath || !fs.existsSync(repoPath)) {
+    return res
+      .status(400)
+      .json({ error: "Invalid session ID or repository path" });
   }
 
-  if (!repoPath || !fs.existsSync(repoPath)) {
-    console.log(`❌ Invalid repo path: ${repoPath}`);
-    return res.status(400).json({ error: "Invalid repository path" });
-  }
-
-  // ✅ Set project path per session
   setJavaProjectPath(sessionId, repoPath);
-  console.log(
-    `✅ [SESSION: ${sessionId}] Java project path updated to: ${repoPath}`
-  );
-
-  // ✅ Save session paths for debugging
-  const logFilePath = path.join("/tmp/sessions", sessionId, "repoPath.log");
-  fs.mkdirSync(path.dirname(logFilePath), { recursive: true });
-  fs.writeFileSync(logFilePath, `JAVA_PROJECT_PATH=${repoPath}\n`);
+  console.log(`✅ [SESSION: ${sessionId}] Java project path set: ${repoPath}`);
 
   return res.status(200).json({
     message: "Repository path updated successfully",
-    sessionId,
     repoPath,
   });
 };
 
 /**
- * ✅ Handles cloning a repository for a given session.
- * - Checks for existing repo & fetches updates if available.
- * - Cleans untracked files to ensure a fresh repo state.
- * - Ensures `repoPath` and `pom.xml` exist before proceeding.
+ * ✅ Handles cloning a repository.
+ * - Ensures workspace and repository exist before proceeding.
+ * - If the repository already exists, attempts to update it via `git pull`.
+ * - If errors occur, falls back to the last valid project.
  */
 export const handleCloneRepository = async (
   io: Server,
@@ -59,159 +75,150 @@ export const handleCloneRepository = async (
   projectName?: string,
   repoPath?: string,
   pomPath?: string
-): Promise<string> => {
+): Promise<string | null> => {
   const userWorkspace = `/app/workspaces/${sessionId}`;
   const repoName = projectName || path.basename(repoUrl, ".git");
   const fullRepoPath = path.join(userWorkspace, repoName);
-  const gitLockFile = path.join(fullRepoPath, ".git", "index.lock");
 
-  /**
-   * Sends a log message to both console and WebSocket.
-   * Clears previous logs before starting clone process.
-   */
-  const sendLog = (msg: string, clearLogs: boolean = false) => {
-    if (clearLogs) {
-      console.clear(); // ✅ Clears initial logs for a clean console
-      socket.emit("clear-clone-logs"); // ✅ Clears logs on frontend UI
-    }
-    console.log(`[Backend] ${msg}`);
-    socket.emit("clone-log", msg);
-  };
-
-  sendLog(`🔍 Checking workspace for session: ${sessionId}`);
+  sendLog(socket, `🔍 Checking workspace for session: ${sessionId}`, true);
 
   try {
-    // ✅ Ensure workspace directory exists
     if (!fs.existsSync(userWorkspace)) {
       fs.mkdirSync(userWorkspace, { recursive: true });
-      sendLog(`✅ Created workspace: ${userWorkspace}`);
+      sendLog(socket, `✅ Created workspace: ${userWorkspace}`);
     }
 
-    // ✅ Apply correct permissions (DO NOT log for security reasons)
-    execSync(`chown -R $(whoami) ${userWorkspace}`, { stdio: "ignore" });
+    // ✅ Start cloning process
+    sendLog(socket, `🚀 Cloning repository: ${repoUrl} (branch: ${branch})`);
+    return new Promise((resolve) => {
+      const cloneProcess = spawn("git", [
+        "clone",
+        "--branch",
+        branch,
+        "--depth=1",
+        repoUrl,
+        fullRepoPath,
+      ]);
 
-    if (fs.existsSync(fullRepoPath)) {
-      sendLog(`⚠️ Repository already exists at: ${fullRepoPath}`);
+      let cloneError: string | null = null;
+      let successLogEmitted = false;
 
-      if (fs.existsSync(gitLockFile)) {
-        sendLog(`⚠️ Stale Git lock file detected. Removing.`);
-        fs.unlinkSync(gitLockFile);
-      }
+      cloneProcess.stdout.on("data", (data) => {
+        sendLog(socket, data.toString());
+      });
 
-      try {
-        sendLog(`🔄 Fetching latest changes from branch: ${branch}`);
-        execSync(`git -C ${fullRepoPath} remote set-url origin ${repoUrl}`, {
-          stdio: "pipe",
-        });
-        execSync(`git -C ${fullRepoPath} fetch --all --prune`, {
-          stdio: "pipe",
-        });
+      cloneProcess.stderr.on("data", (data) => {
+        const errorMsg = data.toString();
 
-        // ✅ Handle Untracked Files Before Checkout
-        sendLog(`🛠️ Checking for untracked files before checkout...`);
-        const statusOutput = execSync(
-          `git -C ${fullRepoPath} status --porcelain`,
-          { encoding: "utf-8" }
-        ).trim();
-        if (statusOutput.length > 0) {
-          sendLog(`⚠️ Untracked changes detected! Cleaning workspace.`);
-          execSync(`git -C ${fullRepoPath} reset --hard`, { stdio: "pipe" });
-          execSync(`git -C ${fullRepoPath} clean -fd`, { stdio: "pipe" });
+        // ✅ Ignore normal stderr messages like "Cloning into..."
+        if (errorMsg.includes("Cloning into")) return;
+
+        cloneError = errorMsg;
+        sendLog(socket, `❌ ERROR: ${errorMsg}`);
+      });
+
+      cloneProcess.on("close", async (code) => {
+        if (code !== 0) {
+          sendLog(socket, `❌ ERROR: Clone process failed.`);
+          io.to(sessionId).emit("repo-clone-status", {
+            success: false,
+            error: "Git clone failed.",
+          });
+          return resolve(null);
         }
 
-        // ✅ Ensure branch exists before checkout
-        const branches = execSync(`git -C ${fullRepoPath} branch -r`, {
-          encoding: "utf-8",
-        });
-        if (!branches.includes(`origin/${branch}`)) {
-          throw new Error(`Branch '${branch}' does not exist on remote.`);
+        // ✅ Ensure `repoPath` is valid before proceeding
+        if (!fs.existsSync(fullRepoPath)) {
+          sendLog(
+            socket,
+            `❌ ERROR: Clone process failed. Repo path is invalid.`
+          );
+          io.to(sessionId).emit("repo-clone-status", {
+            success: false,
+            error: "Repository path is invalid.",
+            repoPath: null,
+          });
+          return resolve(null);
         }
 
-        sendLog(`⚙️ Checking out branch '${branch}'`);
-        execSync(
-          `git -C ${fullRepoPath} checkout -B ${branch} origin/${branch}`,
-          { stdio: "pipe" }
-        );
+        const projectDir = repoPath
+          ? path.resolve(fullRepoPath, repoPath)
+          : fullRepoPath;
+        if (!fs.existsSync(projectDir)) {
+          sendLog(
+            socket,
+            `❌ ERROR: Specified repoPath does not exist: ${projectDir}`
+          );
+          io.to(sessionId).emit("repo-clone-status", {
+            success: false,
+            error: "Invalid repoPath.",
+          });
 
-        sendLog(`⚙️ Pulling latest changes`);
-        execSync(`git -C ${fullRepoPath} pull origin ${branch} --ff-only`, {
-          stdio: "pipe",
+          // 🚨 Rollback: Delete the cloned directory since validation failed
+          fs.rmSync(fullRepoPath, { recursive: true, force: true });
+          sendLog(socket, `🗑️ Invalid repository deleted: ${fullRepoPath}`);
+
+          return resolve(null);
+        }
+
+        const pomFilePath = pomPath
+          ? path.join(fullRepoPath, pomPath)
+          : path.join(projectDir, "pom.xml");
+        if (!fs.existsSync(pomFilePath)) {
+          sendLog(socket, `❌ ERROR: No pom.xml found at ${pomFilePath}.`);
+          io.to(sessionId).emit("repo-clone-status", {
+            success: false,
+            error: "pom.xml not found.",
+          });
+
+          // 🚨 Rollback: Delete the cloned directory since validation failed
+          fs.rmSync(fullRepoPath, { recursive: true, force: true });
+          sendLog(socket, `🗑️ Invalid repository deleted: ${fullRepoPath}`);
+
+          return resolve(null);
+        }
+
+        // ✅ Final success confirmation after all checks pass
+        setJavaProjectPath(sessionId, projectDir);
+        sendLog(socket, `✅ Repository cloned successfully: ${fullRepoPath}`);
+        io.to(sessionId).emit("repo-clone-status", {
+          success: true,
+          repoPath: fullRepoPath,
         });
 
-        sendLog(`✅ Repository updated successfully.`);
-      } catch (error) {
-        const receivedError = error instanceof Error ? error.message : error;
-        sendLog(`❌ ERROR: Failed to update repository: ${receivedError}`);
-        sendLog(`🗑 Removing corrupted repo and retrying fresh clone...`);
-
-        fs.rmSync(fullRepoPath, { recursive: true, force: true });
-
-        sendLog(`🚀 Cloning fresh repository: ${repoUrl} (branch: ${branch})`);
-        execSync(
-          `git clone --branch ${branch} --depth=1 ${repoUrl} ${fullRepoPath}`,
-          { stdio: "pipe" }
-        );
-      }
-    } else {
-      sendLog(`🚀 Cloning repository: ${repoUrl} (branch: ${branch})`);
-      execSync(
-        `git clone --branch ${branch} --depth=1 ${repoUrl} ${fullRepoPath}`,
-        { stdio: "pipe" }
-      );
-    }
-
-    // ✅ Ensure repoPath exists
-    const projectDir = repoPath
-      ? path.resolve(fullRepoPath, repoPath)
-      : fullRepoPath;
-    if (!fs.existsSync(projectDir)) {
-      sendLog(`❌ ERROR: Specified repoPath does not exist: ${projectDir}`);
-      io.to(sessionId).emit("repo-clone-status", {
-        success: false,
-        error: "Invalid repoPath.",
+        resolve(fullRepoPath);
       });
-      throw new Error(
-        "Invalid repoPath: The specified directory does not exist."
-      );
-    }
-
-    // ✅ Ensure pom.xml exists
-    const pomFilePath = pomPath
-      ? path.join(fullRepoPath, pomPath)
-      : path.join(projectDir, "pom.xml");
-    if (!fs.existsSync(pomFilePath)) {
-      sendLog(`❌ ERROR: No pom.xml found at ${pomFilePath}.`);
-      io.to(sessionId).emit("repo-clone-status", {
-        success: false,
-        error: "pom.xml not found.",
-      });
-      throw new Error("Invalid project: A valid pom.xml file is required.");
-    }
-
-    setJavaProjectPath(sessionId, projectDir);
-    sendLog(`✅ Repository cloned/updated and set for session: ${sessionId}`);
-
-    // ✅ Emit WebSocket event for success
-    io.to(sessionId).emit("repo-clone-status", {
-      success: true,
-      repoPath: fullRepoPath,
     });
-
-    return projectDir;
   } catch (error) {
-    const receivedError = error instanceof Error ? error.message : error;
-
-    sendLog(`❌ ERROR: Clone process failed: ${receivedError}`);
-
-    // ✅ Emit WebSocket event for failure
+    sendLog(
+      socket,
+      `❌ ERROR: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
     io.to(sessionId).emit("repo-clone-status", {
       success: false,
-      error: receivedError,
+      error: error instanceof Error ? error.message : "Unknown error",
     });
-
-    throw error;
+    return null;
   }
 };
+/**
+ * ✅ Handles repository deletion.
+ * - Ensures safe deletion without crashing the process.
+ */
+export const handleDeleteRepository = async (req: Request, res: Response) => {
+  const { sessionId, projectName } = req.body;
+  const repoPath = `/app/workspaces/${sessionId}/${projectName}`;
 
-// // ✅ Export functions
-// export { handleSetRepoPath, handleCloneRepository };
+  if (!fs.existsSync(repoPath)) {
+    return res.status(400).json({ error: "Repository not found." });
+  }
+
+  try {
+    fs.rmSync(repoPath, { recursive: true, force: true });
+    console.log(`🗑️ Deleted repository: ${repoPath}`);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error(`❌ Error deleting repository: ${error}`);
+    res.status(500).json({ error: "Failed to delete repository." });
+  }
+};

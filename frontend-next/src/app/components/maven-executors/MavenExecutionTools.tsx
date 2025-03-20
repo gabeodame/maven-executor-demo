@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useSocket } from "../../hooks/useSocket";
 import Accordion from "../ui/Accordion";
-import { useMenu } from "../../store/react-context/MenuContext";
+import { useAppDispatch } from "@/app/store/hooks/hooks";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { closeMenu } from "@/app/store/redux-toolkit/slices/menuSlice";
 
 const executionCommands = [
   "install",
@@ -17,11 +18,13 @@ const executionCommands = [
 const MavenExecutionTools = () => {
   const { loading, runMavenCommand } = useSocket();
   const [selectedCommand, setSelectedCommand] = useState<string | null>(null);
-  const { toggleMenu } = useMenu();
+  const dispatch = useAppDispatch();
   const isMobile = useIsMobile();
 
   const handleRunCommand = (cmd: string) => {
-    if (isMobile) toggleMenu();
+    console.log(`🚀 Running ${cmd}`);
+    if (isMobile) dispatch(closeMenu());
+    console.log(`🚀 Toggling menu`, isMobile);
     setSelectedCommand(cmd);
     runMavenCommand(cmd);
   };
