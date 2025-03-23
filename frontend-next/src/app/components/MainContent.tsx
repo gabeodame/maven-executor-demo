@@ -23,23 +23,30 @@ export default function MainContent() {
   }, []);
 
   return (
-    <section className="flex-1 flex flex-col w-full overflow-hidden min-h-0 pb-2 relative">
-      <div className="flex flex-col flex-1 gap-4 overflow-y-auto px-2 pt-2 pb-4 min-h-0">
+    <section className="bg-gray-800 flex-1 flex flex-col w-full overflow-hidden min-h-0">
+      <div className="flex flex-col flex-1 gap-4 overflow-y-auto px-2 pt-2 pb-4 min-h-0 scroll-isolated">
         <div className="flex-shrink-0">
           <Executor />
         </div>
 
-        {/* 🧠 Console Output container adapts by screen size */}
-        <div className="w-full bg-gray-800 p-4 rounded-lg shadow-md flex flex-col gap-2 flex-1 min-h-0">
+        <div
+          className={`w-full bg-gray-800 p-4 rounded-lg shadow-md flex flex-col gap-2 ${
+            isDesktop ? "flex-1 min-h-0" : "flex-shrink-0"
+          }`}
+        >
           <h3 className="text-lg font-semibold text-center mb-2">
             Console Output
           </h3>
-          <div className="flex-1 overflow-y-auto scroll-isolated rounded-md">
+          <div
+            className={`rounded-md overflow-y-auto scroll-isolated ${
+              isDesktop ? "flex-1 min-h-0" : ""
+            }`}
+            style={isDesktop ? {} : { height: "40vh" }}
+          >
             <ConsoleOutput />
           </div>
         </div>
 
-        {/* ✅ Toggleable metrics (mobile only) */}
         {!isDesktop && showExtra && (
           <div className="flex flex-col gap-4 flex-shrink-0">
             <BuildMetrics />

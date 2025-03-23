@@ -94,9 +94,9 @@ export default async function RootLayout({
       <body
         className={`
           ${geistSans.variable} ${geistMono.variable}
-          antialiased
-          text-white
-          flex flex-col w-full h-[100dvh] overflow-x-hidden
+          antialiased text-white
+          flex flex-col
+          w-full h-[100dvh] overflow-x-hidden overflow-y-auto
           bg-gray-900
           pt-[env(safe-area-inset-top)]
           pb-[env(safe-area-inset-bottom)]
@@ -105,18 +105,18 @@ export default async function RootLayout({
         `}
       >
         <ContextProvider>
-          {/* ✅ Sticky Header */}
+          {/* Header (mobile-aware) */}
           <div className="flex justify-between items-center w-full">
             <MobileScrollBehavior />
             <MobileMenu />
           </div>
 
-          {/* ✅ Main Content */}
+          {/* Content */}
           <main className="w-full flex-1 flex flex-col overflow-hidden">
             {children}
           </main>
 
-          {/* ✅ Footer */}
+          {/* Footer */}
           <Footer />
         </ContextProvider>
       </body>
