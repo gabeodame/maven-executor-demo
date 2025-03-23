@@ -22,6 +22,7 @@ import {
   selectIsModalOpen,
 } from "@/app/store/redux-toolkit/slices/modalSlice";
 import { useSessionCache } from "@/app/store/hooks/useSessionCache";
+import { selectProjectThunk } from "@/app/store/redux-toolkit/slices/projectSlice";
 
 interface CloneRepoFormProps {
   onClone: (formData: CloneRepoFormData) => void;
@@ -50,7 +51,6 @@ const CloneRepoForm = ({ onClone }: CloneRepoFormProps) => {
   const repoName = searchParams.get("repo") || "";
   const branchesUrl = searchParams.get("branches_url") || "";
   const { sessionId } = useSessionCache();
-  // const router = useRouter();
 
   const {
     register,
@@ -110,7 +110,12 @@ const CloneRepoForm = ({ onClone }: CloneRepoFormProps) => {
 
   const handleSubmitForm = (data: CloneRepoFormData) => {
     onClone(data);
-    setTimeout(handleClose, 100);
+    const dispatchData = {
+      sessionId: sessionId!,
+      project: repoName,
+    };
+    dispatch(selectProjectThunk(dispatchData));
+    // setTimeout(handleClose, 100);
   };
 
   return (
