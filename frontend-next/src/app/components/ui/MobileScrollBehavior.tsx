@@ -25,6 +25,7 @@ export default function MobileScrollBehavior() {
 
   return (
     <header
+      style={{ height: "64px" }}
       className={`flex items-center fixed top-0 left-0 w-full bg-gray-800 p-4 shadow-md transition-transform duration-300 z-9999 ${
         hideHeader ? "-translate-y-full" : "translate-y-0"
       }`}

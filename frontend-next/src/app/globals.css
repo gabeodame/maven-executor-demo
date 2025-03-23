@@ -15,12 +15,19 @@ body {
   height: 100%;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  background-color: var(--background);
 }
 
 body {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 :root {
@@ -140,4 +147,9 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.scroll-isolated {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }

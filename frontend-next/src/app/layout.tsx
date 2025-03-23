@@ -2,11 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import ContextProvider from "./store/ContextProvider";
-// import ClientWrapper from "./components/ClientWrapper";
-
 import "./globals.css";
 import Footer from "./components/Footer";
-
 import AdSense from "./components/Adsense";
 import MobileScrollBehavior from "./components/ui/MobileScrollBehavior";
 import MobileMenu from "./components/Menu";
@@ -21,7 +18,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// ✅ Centralized metadata for better SEO
 export const metadata: Metadata = {
   title: "Maven Command Executor | Build & Deploy Maven Projects",
   description:
@@ -53,7 +49,6 @@ export const metadata: Metadata = {
       "Effortlessly execute Maven lifecycle commands, view logs, and analyze artifacts in real time.",
     images: ["https://yourwebsite.com/twitter-image.jpg"],
   },
-
   robots: "index, follow",
 };
 
@@ -70,21 +65,17 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* ✅ Dynamic Metadata for SEO */}
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://yourwebsite.com" />
-        <meta
-          property="og:image"
-          content="https://yourwebsite.com/og-image.jpg"
-        />
         <meta
           name="viewport"
           content="width=device-width, initial-scale=1, viewport-fit=cover"
         />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta
+          name="apple-mobile-web-app-status-bar-style"
+          content="black-translucent"
+        />
+        <meta name="mobile-web-app-capable" content="yes" />
 
-        {/* <meta name="twitter:card" content="summary_large_image" /> */}
-
-        {/* ✅ Load Google Tag Manager (Async) */}
         <AdSense pId="ca-pub-2067270214726984" />
         <Script
           id="google-analytics"
@@ -101,24 +92,32 @@ export default async function RootLayout({
       </head>
 
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col w-full overflow-x-hidden overflow-y-auto`}
+        className={`
+          ${geistSans.variable} ${geistMono.variable}
+          antialiased
+          text-white
+          flex flex-col w-full h-[100dvh] overflow-x-hidden
+          bg-gray-900
+          pt-[env(safe-area-inset-top)]
+          pb-[env(safe-area-inset-bottom)]
+          pl-[env(safe-area-inset-left)]
+          pr-[env(safe-area-inset-right)]
+        `}
       >
         <ContextProvider>
-          <div className="flex h-screen flex-col w-full overflow-hidden">
-            {/* ✅ Dynamic Sticky Header */}
-            <div className="flex justify-between items-center w-full">
-              <MobileScrollBehavior />
-              <MobileMenu />
-            </div>
-
-            {/* ✅ Main Layout (Remove Margin, Use Padding Instead) */}
-            <main className="w-full flex-1 flex flex-col bg-gray-900 pt-12 sm:pt-16 overflow-hidden">
-              {children}
-            </main>
-
-            {/* ✅ Footer */}
-            <Footer />
+          {/* ✅ Sticky Header */}
+          <div className="flex justify-between items-center w-full">
+            <MobileScrollBehavior />
+            <MobileMenu />
           </div>
+
+          {/* ✅ Main Content */}
+          <main className="w-full flex-1 flex flex-col overflow-hidden">
+            {children}
+          </main>
+
+          {/* ✅ Footer */}
+          <Footer />
         </ContextProvider>
       </body>
     </html>
